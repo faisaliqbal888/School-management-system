@@ -24,7 +24,6 @@ const DEMO_PASSWORD = 'Password123'
 
 const rand = <T>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)] as T
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min
-const pickSome = <T>(arr: readonly T[], n: number): T[] => [...arr].sort(() => Math.random() - 0.5).slice(0, n)
 
 const date = (y: number, m: number, d: number) => new Date(Date.UTC(y, m - 1, d))
 

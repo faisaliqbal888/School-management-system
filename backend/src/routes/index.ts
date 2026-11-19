@@ -19,6 +19,8 @@ export const apiRouter = Router()
 // ── implemented ───────────────────────────────────────────
 import { authRouter } from './auth.routes.js'
 import { academicRouter } from './academic.routes.js'
+import { studentsRouter } from './students.routes.js'
 
 apiRouter.use(authRouter)
 apiRouter.use(academicRouter)
+apiRouter.use(studentsRouter)

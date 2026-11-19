@@ -1,57 +1,116 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, SlidersHorizontal, Download, UserPlus } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Search, Download, UserPlus, Loader2 } from "lucide-react"
+import type { StudentStatus } from "@/lib/hooks/use-students"
 
-interface StudentFiltersProps {
-  onAddStudent?: () => void
+export interface StudentFilterValues {
+  search: string
+  classId: string
+  status: StudentStatus | "all"
 }
 
-export function StudentFilters({ onAddStudent }: StudentFiltersProps) {
+interface StudentFiltersProps {
+  value: StudentFilterValues
+  onChange: (next: StudentFilterValues) => void
+  classes: { id: string; name: string }[]
+  onAddStudent?: () => void
+  onExport?: () => void
+  isExporting?: boolean
+}
+
+export function StudentFilters({
+  value,
+  onChange,
+  classes,
+  onAddStudent,
+  onExport,
+  isExporting = false,
+}: StudentFiltersProps) {
+  // Debounce search so typing does not fire a request per keystroke.
+  const [searchInput, setSearchInput] = useState(value.search)
+
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (searchInput !== value.search) onChange({ ...value, search: searchInput })
+    }, 350)
+    return () => clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput])
+
+  useEffect(() => {
+    setSearchInput(value.search)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value.search])
+
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-      <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full md:w-auto">
-        <div className="relative flex-1 max-w-sm">
+    <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
+      <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
+        <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search students..." className="pl-10 bg-card border-border" />
+          <Input
+            placeholder="Search name, admission no, guardian…"
+            className="border-border bg-card pl-10"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
         </div>
-        <Select defaultValue="all">
-          <SelectTrigger className="w-full sm:w-[140px] bg-card">
+
+        <Select
+          value={value.classId}
+          onValueChange={(classId) => onChange({ ...value, classId })}
+        >
+          <SelectTrigger className="w-full bg-card sm:w-[150px]">
             <SelectValue placeholder="Class" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Classes</SelectItem>
-            <SelectItem value="6">Class 6</SelectItem>
-            <SelectItem value="7">Class 7</SelectItem>
-            <SelectItem value="8">Class 8</SelectItem>
-            <SelectItem value="9">Class 9</SelectItem>
-            <SelectItem value="10">Class 10</SelectItem>
+            {classes.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Select defaultValue="all">
-          <SelectTrigger className="w-full sm:w-[140px] bg-card">
+
+        <Select
+          value={value.status}
+          onValueChange={(status) => onChange({ ...value, status: status as StudentStatus | "all" })}
+        >
+          <SelectTrigger className="w-full bg-card sm:w-[140px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="INACTIVE">Inactive</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
+            <SelectItem value="GRADUATED">Graduated</SelectItem>
+            <SelectItem value="WITHDRAWN">Withdrawn</SelectItem>
           </SelectContent>
         </Select>
-        <Button variant="outline" className="gap-2 bg-transparent">
-          <SlidersHorizontal className="h-4 w-4" />
-          Filters
-        </Button>
       </div>
-      <div className="flex gap-2 w-full md:w-auto">
-        <Button variant="outline" className="gap-2 flex-1 md:flex-none bg-transparent">
-          <Download className="h-4 w-4" />
+
+      <div className="flex w-full gap-2 md:w-auto">
+        <Button
+          variant="outline"
+          className="flex-1 gap-2 bg-transparent md:flex-none"
+          onClick={onExport}
+          disabled={isExporting}
+        >
+          {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           Export
         </Button>
-        <Button className="gap-2 flex-1 md:flex-none" onClick={onAddStudent}>
+        <Button className="flex-1 gap-2 md:flex-none" onClick={onAddStudent}>
           <UserPlus className="h-4 w-4" />
           Add Student
         </Button>

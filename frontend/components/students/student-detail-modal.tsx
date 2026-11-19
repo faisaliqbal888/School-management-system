@@ -1,386 +1,477 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useStudentDetail } from "@/lib/hooks/useStudentDetail"
-import type { Student } from "./student-table"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Mail,
   Phone,
   MapPin,
   Calendar,
-  Edit,
   Printer,
-  User,
   GraduationCap,
   CreditCard,
   ClipboardCheck,
   FileText,
-  MessageSquare,
   TrendingUp,
+  AlertCircle,
+  Droplet,
+  User,
 } from "lucide-react"
+import { useStudent } from "@/lib/hooks/use-students"
+import { formatPKR, formatDate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 interface StudentDetailModalProps {
-  student: Student | null
+  studentId: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onUpdated?: () => void
 }
 
-export function StudentDetailModal({ student, open, onOpenChange }: StudentDetailModalProps) {
-  const { student: detailedStudent } = useStudentDetail(student?.id || null)
-  const [activeTab, setActiveTab] = useState("overview")
+const STATUS_STYLES: Record<string, string> = {
+  ACTIVE: "bg-emerald-100 text-emerald-700",
+  INACTIVE: "bg-gray-100 text-gray-600",
+  PENDING: "bg-amber-100 text-amber-700",
+  GRADUATED: "bg-blue-100 text-blue-700",
+  TRANSFERRED: "bg-violet-100 text-violet-700",
+  WITHDRAWN: "bg-red-100 text-red-700",
+}
 
-  useEffect(() => {
-    if (open) {
-      setActiveTab("overview")
-    }
-  }, [open, student?.id])
+const ATTENDANCE_STYLES: Record<string, string> = {
+  PRESENT: "bg-emerald-500",
+  LATE: "bg-amber-500",
+  ABSENT: "bg-red-500",
+  EXCUSED: "bg-blue-500",
+  HOLIDAY: "bg-gray-300",
+}
 
-  const displayStudent = detailedStudent || student
-  const academicData = detailedStudent?.academics
-  const resultsData = detailedStudent?.results || []
-  const feesData = detailedStudent?.fees
-  const attendanceData = detailedStudent?.attendance
-  const documentsData = detailedStudent?.documents || []
-  const notesData = detailedStudent?.notes || []
+export function StudentDetailModal({
+  studentId,
+  open,
+  onOpenChange,
+  onUpdated,
+}: StudentDetailModalProps) {
+  const { student, isLoading, error } = useStudent(open ? studentId : null)
+  const [tab, setTab] = useState("overview")
 
-  if (!displayStudent) return null
+  const print = () => window.print()
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-6xl p-0 border-0 shadow-2xl rounded-xl [&>button]:text-white [&>button]:bg-white/10 [&>button]:hover:bg-white/20 [&>button]:top-4 [&>button]:right-4 [&>button]:h-8 [&>button]:w-8">
-        <DialogTitle className="sr-only">Student Details: {displayStudent.name}</DialogTitle>
-        {/* Premium Gradient Header */}
-        <div className="relative bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 p-6 text-white rounded-t-xl">
-          <div className="absolute inset-0 overflow-hidden rounded-t-xl">
-            <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full -mr-48 -mt-48 blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-72 h-72 bg-white/10 rounded-full -ml-36 -mb-36 blur-3xl" />
-          </div>
+      <DialogContent className="max-h-[92vh] w-full max-w-4xl overflow-y-auto border-0 p-0 shadow-2xl">
+        <DialogTitle className="sr-only">
+          Student Details{student ? `: ${student.name}` : ""}
+        </DialogTitle>
 
-          <div className="relative z-10">
-            <div className="flex items-end justify-between gap-4 mb-4">
-              <div className="flex items-end gap-4">
-                <Avatar className="h-24 w-24 ring-4 ring-white/40 shadow-lg border-2 border-white">
-                  <AvatarImage src={displayStudent.avatar} alt={displayStudent.name} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-400 text-white text-2xl font-bold">
-                    {displayStudent.name.split(" ").map((n: string) => n[0]).join("")}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="text-3xl font-bold text-white">{displayStudent.name}</h2>
-                  <p className="text-blue-100 text-sm font-semibold">{displayStudent.admissionNo}</p>
-                  <div className="flex gap-2 mt-2">
-                    <Badge className="bg-emerald-400 text-emerald-900 font-bold">✓ {displayStudent.status}</Badge>
-                    <Badge className="bg-white/30 text-white border border-white/50">Class {displayStudent.class}-{displayStudent.section}</Badge>
-                  </div>
+        {/* header */}
+        <div className="relative rounded-t-lg bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 p-6 text-white">
+          <div className="flex items-start gap-5">
+            <Avatar className="h-20 w-20 ring-4 ring-white/30">
+              <AvatarImage src={student?.avatarUrl ?? "/placeholder.svg"} />
+              <AvatarFallback className="bg-white/20 text-2xl text-white">
+                {student?.name
+                  ?.split(" ")
+                  .slice(0, 2)
+                  .map((n) => n[0]?.toUpperCase())
+                  .join("") ?? "ST"}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="min-w-0 flex-1">
+              {isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-7 w-48 bg-white/20" />
+                  <Skeleton className="h-4 w-32 bg-white/20" />
                 </div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button size="sm" className="gap-2 bg-white text-purple-600 hover:bg-blue-50 font-semibold">
-                  <Edit className="h-4 w-4" />
-                  Edit
-                </Button>
-                <Button size="sm" className="gap-2 bg-white/25 text-white hover:bg-white/40 backdrop-blur">
-                  <Printer className="h-4 w-4" />
-                  Print
-                </Button>
-              </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h2 className="text-2xl font-bold">{student?.name}</h2>
+                    {student && (
+                      <Badge className={cn("border-0", STATUS_STYLES[student.status])}>
+                        {student.status}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-white/80">
+                    {student?.admissionNo}
+                    {student?.rollNo ? ` · Roll ${student.rollNo}` : ""}
+                    {student?.class ? ` · ${student.class.name}` : ""}
+                    {student?.section ? `-${student.section.name}` : ""}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-4 text-sm text-white/90">
+                    {student?.email && (
+                      <span className="flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5" />
+                        {student.email}
+                      </span>
+                    )}
+                    {student?.phone && (
+                      <span className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5" />
+                        {student.phone}
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
-            {/* Quick Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-white/20">
-              <div className="text-center">
-                <p className="text-blue-100 text-xs font-semibold uppercase">Class Rank</p>
-                <p className="text-2xl font-bold text-white">#{academicData?.classRank || 3}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-blue-100 text-xs font-semibold uppercase">Attendance</p>
-                <p className="text-2xl font-bold text-white">{attendanceData?.rate || '94%'}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-blue-100 text-xs font-semibold uppercase">Fee Status</p>
-                <p className={`text-xl font-bold ${feesData?.pending === '$0' ? 'text-emerald-300' : 'text-yellow-300'}`}>
-                  {feesData?.pending === '$0' ? 'Paid' : 'Pending'}
-                </p>
-              </div>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={print}
+              className="text-white hover:bg-white/20 hover:text-white"
+            >
+              <Printer className="mr-1.5 h-4 w-4" />
+              Print
+            </Button>
           </div>
         </div>
 
-        {/* Tabs Content */}
-        <div className="p-6 bg-gradient-to-b from-gray-50 to-white">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-white p-1 rounded-lg border border-gray-200 shadow-sm grid grid-cols-3 sm:flex sm:flex-wrap md:flex-nowrap w-full h-auto gap-1">
-              <TabsTrigger value="overview" className="flex-1 min-w-[80px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded font-semibold text-xs px-2 py-2">
-                <User className="h-3.5 w-3.5 mr-1" />
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="academics" className="flex-1 min-w-[80px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded font-semibold text-xs px-2 py-2">
-                <GraduationCap className="h-3.5 w-3.5 mr-1" />
-                Academics
-              </TabsTrigger>
-              <TabsTrigger value="results" className="flex-1 min-w-[80px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded font-semibold text-xs px-2 py-2">
-                <TrendingUp className="h-3.5 w-3.5 mr-1" />
-                Results
-              </TabsTrigger>
-              <TabsTrigger value="fees" className="flex-1 min-w-[80px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded font-semibold text-xs px-2 py-2">
-                <CreditCard className="h-3.5 w-3.5 mr-1" />
-                Fees
-              </TabsTrigger>
-              <TabsTrigger value="attendance" className="flex-1 min-w-[80px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded font-semibold text-xs px-2 py-2">
-                <ClipboardCheck className="h-3.5 w-3.5 mr-1" />
-                Attendance
-              </TabsTrigger>
-              <TabsTrigger value="documents" className="flex-1 min-w-[80px] data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-500 data-[state=active]:to-purple-500 data-[state=active]:text-white rounded font-semibold text-xs px-2 py-2">
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Docs
-              </TabsTrigger>
-            </TabsList>
+        {/* body */}
+        <div className="p-6">
+          {error && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              <AlertCircle className="mt-0.5 h-4 w-4 text-destructive" />
+              <span>{error}</span>
+            </div>
+          )}
 
-            {/* Overview Tab */}
-            <TabsContent value="overview" className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-6">
-                <Card className="border-0 shadow-sm hover:shadow-lg transition-all border-b-4 border-blue-200 bg-white">
-                  <CardHeader className="pb-3 bg-blue-50">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Mail className="h-5 w-5 text-blue-600" />
-                      Personal Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 pt-4">
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Email</p>
-                      <p className="text-sm text-gray-900">{displayStudent.email}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Phone</p>
-                      <p className="text-sm text-gray-900">{displayStudent.phone}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">DOB</p>
-                      <p className="text-sm text-gray-900">{displayStudent.dateOfBirth}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Address</p>
-                      <p className="text-sm text-gray-900">{displayStudent.address}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+          {isLoading ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : student ? (
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="academics">Academics</TabsTrigger>
+                <TabsTrigger value="attendance">Attendance</TabsTrigger>
+                <TabsTrigger value="fees">Fees</TabsTrigger>
+              </TabsList>
 
-                <Card className="border-0 shadow-sm hover:shadow-lg transition-all border-b-4 border-purple-200 bg-white">
-                  <CardHeader className="pb-3 bg-purple-50">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <User className="h-5 w-5 text-purple-600" />
-                      Guardian Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 pt-4">
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Parent Name</p>
-                      <p className="text-sm text-gray-900">{displayStudent.parentName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Relationship</p>
-                      <p className="text-sm text-gray-900">Father</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Contact</p>
-                      <p className="text-sm text-gray-900">{displayStudent.phone}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase">Email</p>
-                      <p className="text-sm text-gray-900">{displayStudent.parentName.toLowerCase().replace(" ", ".")}@email.com</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+              {/* OVERVIEW */}
+              <TabsContent value="overview" className="mt-5 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <InfoCard icon={User} title="Personal">
+                    <Row label="Full name" value={student.name} />
+                    <Row label="Admission no" value={student.admissionNo} />
+                    <Row label="Date of birth" value={formatDate(student.dateOfBirth)} />
+                    <Row
+                      label="Gender"
+                      value={
+                        student.gender === "MALE"
+                          ? "Male"
+                          : student.gender === "FEMALE"
+                            ? "Female"
+                            : "Other"
+                      }
+                    />
+                    <Row label="Blood group" value={student.bloodGroup ?? "—"} />
+                  </InfoCard>
 
-            {/* Academics Tab */}
-            <TabsContent value="academics" className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                <Card className="border-0 shadow-sm bg-blue-50 border-l-4 border-blue-500">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-sm font-semibold text-gray-600">OVERALL GRADE</p>
-                    <p className="text-4xl font-bold text-blue-600 mt-2">{academicData?.overallGrade || '85%'}</p>
-                    <p className="text-xs text-gray-500 mt-1">Performance Score</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm bg-purple-50 border-l-4 border-purple-500">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-sm font-semibold text-gray-600">CLASS RANK</p>
-                    <p className="text-4xl font-bold text-purple-600 mt-2">#{academicData?.classRank || 3}</p>
-                    <p className="text-xs text-gray-500 mt-1">Out of Class</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm bg-green-50 border-l-4 border-green-500">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-sm font-semibold text-gray-600">GRADE LEVEL</p>
-                    <p className="text-4xl font-bold text-green-600 mt-2">{academicData?.gradeLevel || 'A'}</p>
-                    <p className="text-xs text-gray-500 mt-1">Letter Grade</p>
-                  </CardContent>
-                </Card>
-              </div>
+                  <InfoCard icon={MapPin} title="Contact">
+                    <Row label="Email" value={student.email} />
+                    <Row label="Phone" value={student.phone ?? "—"} />
+                    <Row label="Address" value={student.address ?? "—"} />
+                    <Row label="City" value={student.city ?? "—"} />
+                    <Row label="Admitted" value={formatDate(student.admissionDate)} />
+                  </InfoCard>
 
-              <Card className="border-0 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <GraduationCap className="h-5 w-5 text-blue-600" />
-                    Subject Performance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {academicData?.subjects?.map((item: any) => (
-                    <div key={item.subject}>
-                      <div className="flex justify-between mb-2">
-                        <span className="font-medium text-gray-800">{item.subject}</span>
-                        <span className="font-bold text-blue-600">{item.score}%</span>
-                      </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500" style={{ width: `${item.score}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </TabsContent>
+                  <InfoCard icon={GraduationCap} title="Academic">
+                    <Row label="Class" value={student.class?.name ?? "Not assigned"} />
+                    <Row
+                      label="Section"
+                      value={student.section ? `Section ${student.section.name}` : "—"}
+                    />
+                    <Row label="Academic year" value={student.academicYear ?? "—"} />
+                    <Row label="Roll no" value={student.rollNo ?? "—"} />
+                    <Row
+                      label="Average"
+                      value={student.averagePercent !== null ? `${student.averagePercent}%` : "—"}
+                    />
+                  </InfoCard>
 
-            {/* Results Tab */}
-            <TabsContent value="results" className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                {resultsData.map((result: any, idx: number) => (
-                  <Card key={idx} className="border-0 shadow-sm border-l-4 border-amber-500 bg-amber-50">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex justify-between">
-                        <span>{result.exam}</span>
-                        <span className="text-amber-600">{result.score}%</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="h-2 bg-gray-300 rounded-full overflow-hidden">
-                        <div className="h-full bg-amber-500" style={{ width: `${result.score}%` }} />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <p className="text-gray-600 font-semibold">GRADE</p>
-                          <p className="text-gray-900 font-bold mt-1">{result.grade}</p>
+                  <InfoCard icon={Phone} title="Guardian">
+                    {student.guardians.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No guardian recorded</p>
+                    ) : (
+                      student.guardians.map((g) => (
+                        <div key={g.id} className="space-y-1">
+                          <p className="font-medium">
+                            {g.name}{" "}
+                            <span className="text-xs font-normal text-muted-foreground">
+                              ({g.relation})
+                            </span>
+                          </p>
+                          <p className="text-sm text-muted-foreground">{g.phone}</p>
+                          {g.email && <p className="text-xs text-muted-foreground">{g.email}</p>}
+                          {g.occupation && (
+                            <p className="text-xs text-muted-foreground">{g.occupation}</p>
+                          )}
                         </div>
-                        <div>
-                          <p className="text-gray-600 font-semibold">DATE</p>
-                          <p className="text-gray-900 font-bold mt-1">{result.date}</p>
-                        </div>
+                      ))
+                    )}
+                  </InfoCard>
+                </div>
+              </TabsContent>
+
+              {/* ACADEMICS */}
+              <TabsContent value="academics" className="mt-5 space-y-4">
+                {student.averagePercent !== null && (
+                  <Card>
+                    <CardContent className="flex items-center gap-4 p-5">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+                        <TrendingUp className="h-7 w-7" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Average across recorded exams</p>
+                        <p className="text-2xl font-bold">{student.averagePercent}%</p>
                       </div>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            </TabsContent>
+                )}
 
-            {/* Fees Tab */}
-            <TabsContent value="fees" className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                <Card className="border-0 shadow-sm border-l-4 border-green-500 bg-green-50">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">Total Paid</p>
-                    <p className="text-3xl font-bold text-green-600 mt-2">{feesData?.totalPaid || '$4,500'}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm border-l-4 border-amber-500 bg-amber-50">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">Pending</p>
-                    <p className="text-3xl font-bold text-amber-600 mt-2">{feesData?.pending || '$1,500'}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm border-l-4 border-blue-500 bg-blue-50">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">Total Fee</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-2">{feesData?.totalFee || '$6,000'}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+                {student.results.length === 0 ? (
+                  <EmptyState icon={FileText} message="No exam results recorded yet." />
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium">Exam</th>
+                          <th className="px-4 py-2 text-left font-medium">Subject</th>
+                          <th className="px-4 py-2 text-right font-medium">Marks</th>
+                          <th className="px-4 py-2 text-right font-medium">Grade</th>
+                          <th className="px-4 py-2 text-right font-medium">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {student.results.map((r) => (
+                          <tr key={r.id} className="border-t border-border">
+                            <td className="px-4 py-2">{r.exam}</td>
+                            <td className="px-4 py-2">{r.subject}</td>
+                            <td className="px-4 py-2 text-right font-mono">
+                              {r.marks}/{r.totalMarks}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              <Badge variant="secondary">{r.grade ?? "—"}</Badge>
+                            </td>
+                            <td className="px-4 py-2 text-right text-muted-foreground">
+                              {formatDate(r.date)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </TabsContent>
 
-            {/* Attendance Tab */}
-            <TabsContent value="attendance" className="space-y-4">
-              <div className="grid md:grid-cols-4 gap-4">
-                <Card className="border-0 shadow-sm border-l-4 border-blue-500 bg-blue-50">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">Rate</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-2">{attendanceData?.rate || '94%'}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm border-l-4 border-green-500 bg-green-50">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">Present</p>
-                    <p className="text-3xl font-bold text-green-600 mt-2">{attendanceData?.presentDays || 156}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm border-l-4 border-red-500 bg-red-50">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">Absent</p>
-                    <p className="text-3xl font-bold text-red-600 mt-2">{attendanceData?.absentDays || 10}</p>
-                  </CardContent>
-                </Card>
-                <Card className="border-0 shadow-sm border-l-4 border-amber-500 bg-amber-50">
-                  <CardContent className="pt-6 text-center">
-                    <p className="text-xs font-semibold text-gray-600 uppercase">Late</p>
-                    <p className="text-3xl font-bold text-amber-600 mt-2">{attendanceData?.lateArrivals || 5}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
+              {/* ATTENDANCE */}
+              <TabsContent value="attendance" className="mt-5 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <StatBox
+                    icon={ClipboardCheck}
+                    label="Attendance rate"
+                    value={student.attendance.rate !== null ? `${student.attendance.rate}%` : "—"}
+                    tone="emerald"
+                  />
+                  <StatBox
+                    icon={Calendar}
+                    label="Recorded days"
+                    value={String(student.attendance.sampleDays)}
+                    tone="blue"
+                  />
+                  <StatBox
+                    icon={Droplet}
+                    label="Present days"
+                    value={String(student.attendance.presentDays)}
+                    tone="violet"
+                  />
+                </div>
 
-            {/* Documents Tab */}
-            <TabsContent value="documents" className="space-y-4">
-              <Card className="border-0 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-blue-600" />
-                    Documents
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {documentsData.map((doc: any, idx: number) => (
-                    <div key={idx} className="flex items-center justify-between p-3 border rounded-lg hover:bg-blue-50 transition">
-                      <div className="flex-1">
-                        <p className="font-semibold text-sm">{doc.name}</p>
-                        <p className="text-xs text-gray-500">{doc.uploadDate}</p>
+                {student.attendance.recent.length === 0 ? (
+                  <EmptyState icon={Calendar} message="No attendance recorded yet." />
+                ) : (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Recent days</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex flex-wrap gap-1.5">
+                        {student.attendance.recent.map((d) => (
+                          <div
+                            key={d.date}
+                            title={`${formatDate(d.date)} — ${d.status}`}
+                            className={cn(
+                              "h-8 w-8 rounded-md",
+                              ATTENDANCE_STYLES[d.status] ?? "bg-gray-300",
+                            )}
+                          />
+                        ))}
                       </div>
-                      <Button size="sm" className="bg-blue-600 text-white">Download</Button>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5 text-indigo-600" />
-                    Notes & Remarks
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {notesData.map((note: any, idx: number) => (
-                    <div key={idx} className="p-3 rounded-lg bg-indigo-50 border border-indigo-200">
-                      <div className="flex justify-between mb-2">
-                        <p className="font-semibold text-sm">{note.author}</p>
-                        <p className="text-xs text-gray-500">{note.date}</p>
+                      <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                        {Object.entries(ATTENDANCE_STYLES).map(([status, color]) => (
+                          <span key={status} className="flex items-center gap-1.5">
+                            <span className={cn("h-3 w-3 rounded", color)} />
+                            {status.charAt(0) + status.slice(1).toLowerCase()}
+                          </span>
+                        ))}
                       </div>
-                      <p className="text-sm text-gray-700">{note.note}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                    </CardContent>
+                  </Card>
+                )}
+              </TabsContent>
+
+              {/* FEES */}
+              <TabsContent value="fees" className="mt-5 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <StatBox
+                    icon={CreditCard}
+                    label="Total billed"
+                    value={formatPKR(student.fees.totalBilled)}
+                    tone="blue"
+                  />
+                  <StatBox
+                    icon={CreditCard}
+                    label="Paid"
+                    value={formatPKR(student.fees.totalPaid)}
+                    tone="emerald"
+                  />
+                  <StatBox
+                    icon={CreditCard}
+                    label="Outstanding"
+                    value={formatPKR(student.fees.outstanding)}
+                    tone={student.fees.outstanding > 0 ? "red" : "emerald"}
+                  />
+                </div>
+
+                {student.fees.invoices.length === 0 ? (
+                  <EmptyState icon={CreditCard} message="No invoices raised yet." />
+                ) : (
+                  <div className="overflow-hidden rounded-lg border border-border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium">Invoice</th>
+                          <th className="px-4 py-2 text-left font-medium">Title</th>
+                          <th className="px-4 py-2 text-right font-medium">Amount</th>
+                          <th className="px-4 py-2 text-right font-medium">Paid</th>
+                          <th className="px-4 py-2 text-right font-medium">Due</th>
+                          <th className="px-4 py-2 text-right font-medium">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {student.fees.invoices.map((i) => (
+                          <tr key={i.id} className="border-t border-border">
+                            <td className="px-4 py-2 font-mono text-xs">{i.invoiceNo}</td>
+                            <td className="px-4 py-2">{i.title}</td>
+                            <td className="px-4 py-2 text-right">{formatPKR(i.amount)}</td>
+                            <td className="px-4 py-2 text-right">{formatPKR(i.paid)}</td>
+                            <td className="px-4 py-2 text-right text-muted-foreground">
+                              {formatDate(i.dueDate)}
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              <Badge
+                                variant={i.status === "PAID" ? "secondary" : "outline"}
+                                className={i.status === "PAID" ? "text-emerald-600" : ""}
+                              >
+                                {i.status}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────
+
+function InfoCard({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: React.ElementType
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center gap-2 pb-2">
+        <Icon className="h-4 w-4 text-primary" />
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1.5">{children}</CardContent>
+    </Card>
+  )
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="truncate text-right font-medium">{value}</span>
+    </div>
+  )
+}
+
+function StatBox({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ElementType
+  label: string
+  value: string
+  tone: "emerald" | "blue" | "violet" | "red"
+}) {
+  const tones = {
+    emerald: "bg-emerald-50 text-emerald-600",
+    blue: "bg-blue-50 text-blue-600",
+    violet: "bg-violet-50 text-violet-600",
+    red: "bg-red-50 text-red-600",
+  }
+  return (
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl", tones[tone])}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-lg font-bold">{value}</p>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function EmptyState({ icon: Icon, message }: { icon: React.ElementType; message: string }) {
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-10 text-center">
+      <Icon className="h-6 w-6 text-muted-foreground" />
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
   )
 }
