@@ -43,7 +43,7 @@ School-management-system/
 ## 🚀 Getting started
 
 ```bash
-git clone https://github.com/faisaliqaliqbal888/School-management-system.git   # your fork
+git clone https://github.com/faisaliqbal888/School-management-system.git   # your fork
 cd School-management-system
 npm install                    # installs frontend + backend workspaces
 ```
@@ -55,14 +55,33 @@ cp frontend/.env.example frontend/.env.local
 npm run dev:frontend           # http://localhost:3000
 ```
 
-### Backend *(available once Phase 1 lands)*
+### Backend
 
 ```bash
 cp backend/.env.example backend/.env
-npm run dev:backend            # http://localhost:5000
+#   → set DATABASE_URL to a PostgreSQL 16 instance
+
+npm run migrate:deploy --workspace=backend   # create the 34-model schema
+npm run prisma:generate --workspace=backend  # generate the Prisma client
+npm run db:seed --workspace=backend          # optional: demo school (80 students)
+npm run dev:backend                          # http://localhost:5000/api/v1/health
 ```
 
-### Demo login (temporary — removed in Phase 2)
+No native Prisma engines are downloaded — the client uses a WASM query compiler,
+so it works in restricted CI/sandbox environments. Details: [`backend/README.md`](backend/README.md).
+
+### Accounts
+
+**Seeded backend** (after `npm run db:seed`) — password `Password123`:
+
+| Role | Email |
+|---|---|
+| Admin | `admin@ravischool.edu.pk` |
+| Teacher | `ahmed.1@ravischool.edu.pk` |
+| Student | `student@ravischool.edu.pk` |
+| Parent | `parent@ravischool.edu.pk` |
+
+**Frontend demo login** (temporary, until Phase 2 wires the real API):
 
 | Role | Email | Password |
 |---|---|---|
@@ -109,16 +128,16 @@ CI runs typecheck + build for the frontend and typecheck + tests for the backend
 
 ## 🗺️ Roadmap
 
-| Phase | Scope |
-|---|---|
-| 0 ✅ | Restructure, build fixes, security upgrade, CI |
-| 1 | Backend foundation, Prisma schema, seed |
-| 2 | Real auth, RBAC, parent role |
-| 3 | Students, teachers, classes, attendance, fees (full CRUD) |
-| 4 | Exams, timetable, notifications, library, transport, hostel, inventory, HR |
-| 5 | Live dashboards, reports, CSV/PDF exports |
-| 6 | Mobile drawer, loading states, image optimisation, remove demo data |
-| 7 | Tests, security pass, deployment |
+| Phase | Scope | Status |
+|---|---|---|:--:|
+| 0 | Restructure, build fixes, security upgrade, CI | ✅ |
+| 1 | Backend foundation, 34-model schema, migrations, seed, academic API | ✅ |
+| 2 | Real auth (JWT + refresh), RBAC, parent role, frontend login | 🔜 |
+| 3 | Students, teachers, attendance, fees — full CRUD + frontend wiring | 🔜 |
+| 4 | Exams, timetable, notifications, library, transport, hostel, inventory, HR | 🔜 |
+| 5 | Live dashboards, reports, CSV/PDF exports | 🔜 |
+| 6 | Mobile drawer, loading states, image optimisation, remove demo data | 🔜 |
+| 7 | Tests, security pass, deployment | 🔜 |
 
 Full detail: [`docs/PLAN.md`](docs/PLAN.md)
 

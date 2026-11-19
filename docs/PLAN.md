@@ -84,7 +84,7 @@ School-management-system/
 - [ ] Remove Google-Fonts build-time fetch (offline/CI safe)
 - [ ] `.env.example`, GitHub Actions CI, root workspace scripts
 
-### Phase 1 — Backend foundation (days 5–11)
+### Phase 1 — Backend foundation ✅ COMPLETE
 - Express + TS scaffold, config loader, Prisma + PostgreSQL
 - Full schema: User, Student, Guardian, Teacher, Staff, Class, Section, Subject,
   Enrollment, Attendance, Exam, ExamResult, FeeStructure, Invoice, Payment,

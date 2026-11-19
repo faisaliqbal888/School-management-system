@@ -10,6 +10,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/school_db?schema=public
+  JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
+  JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
+
 jobs:
   frontend:
     name: Frontend — typecheck & build
@@ -33,11 +38,26 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
 
   backend:
-    name: Backend — typecheck & test
+    name: Backend — typecheck, migrate & test
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: school_db
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -48,5 +68,13 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - run: npm ci
+
+      # Generates the Prisma client without downloading native engines
+      # (WASM query compiler — see backend/scripts/generate-client.cjs)
+      - run: npm run prisma:generate
+
+      # Apply the checked-in migration SQL to the CI database
+      - run: npm run migrate:deploy
+
       - run: npm run typecheck
-      - run: npm test --if-present
+      - run: npm test
