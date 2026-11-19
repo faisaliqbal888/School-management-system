@@ -1,193 +1,173 @@
 "use client"
 
-import { useAuth, useRequireRole } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRequireRole } from "@/lib/auth-context"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
+import { AttendanceReport, MonthlyTrend } from "@/components/attendance/attendance-report"
+import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Loader2, CheckCircle2, XCircle, Clock, AlertCircle } from "lucide-react"
-
-const subjects = ["All Subjects", "Mathematics", "Physics", "Chemistry", "English", "Computer Science", "Biology"]
-
-const attendanceData = [
-  {
-    date: "Dec 6, 2024",
-    day: "Friday",
-    subjects: [
-      { name: "Mathematics", status: "present" },
-      { name: "Physics", status: "present" },
-      { name: "Chemistry", status: "late" },
-      { name: "English", status: "present" },
-    ],
-  },
-  {
-    date: "Dec 5, 2024",
-    day: "Thursday",
-    subjects: [
-      { name: "Mathematics", status: "present" },
-      { name: "Computer Science", status: "present" },
-      { name: "Biology", status: "absent" },
-      { name: "English", status: "present" },
-    ],
-  },
-  {
-    date: "Dec 4, 2024",
-    day: "Wednesday",
-    subjects: [
-      { name: "Mathematics", status: "present" },
-      { name: "Physics", status: "present" },
-      { name: "Chemistry", status: "present" },
-      { name: "Computer Science", status: "present" },
-    ],
-  },
-  {
-    date: "Dec 3, 2024",
-    day: "Tuesday",
-    subjects: [
-      { name: "Mathematics", status: "present" },
-      { name: "Physics", status: "late" },
-      { name: "English", status: "present" },
-      { name: "Biology", status: "present" },
-    ],
-  },
-]
-
-const statusConfig = {
-  present: { icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-100 dark:bg-emerald-950" },
-  absent: { icon: XCircle, color: "text-red-600", bg: "bg-red-100 dark:bg-red-950" },
-  late: { icon: Clock, color: "text-amber-600", bg: "bg-amber-100 dark:bg-amber-950" },
-  excused: { icon: AlertCircle, color: "text-blue-600", bg: "bg-blue-100 dark:bg-blue-950" },
-}
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  AlertCircle,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  TrendingUp,
+  XCircle,
+} from "lucide-react"
+import { useAttendanceSummary } from "@/lib/hooks/use-attendance"
+import { formatDate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 
 export default function StudentAttendancePage() {
-  const { user, isLoading, isAuthenticated } = useAuth()
-  const [selectedSubject, setSelectedSubject] = useState("All Subjects")
-
   const { ready } = useRequireRole("STUDENT")
+  const { summary, isLoading, error } = useAttendanceSummary()
 
-  if (!ready) return <FullPageLoader />
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <StudentSidebar />
-      <div className="lg:pl-64 transition-all duration-300">
+      <div className="transition-all duration-300 lg:pl-64">
         <StudentHeader />
-        <main className="p-6 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">My Attendance</h1>
-              <p className="text-muted-foreground">View your subject-wise attendance records</p>
+        <main className="space-y-6 p-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">My Attendance</h1>
+            <p className="text-muted-foreground">
+              Your day-by-day record and monthly attendance rate
+            </p>
+          </div>
+
+          {error && (
+            <Card className="border-destructive/30 bg-destructive/5">
+              <CardContent className="flex items-center gap-2 p-4 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </CardContent>
+            </Card>
+          )}
+
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-28 w-full" />
+              ))}
             </div>
-            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select subject" />
-              </SelectTrigger>
-              <SelectContent>
-                {subjects.map((subject) => (
-                  <SelectItem key={subject} value={subject}>
-                    {subject}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Summary Cards */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Overall</p>
-                    <p className="text-2xl font-bold text-emerald-600">92%</p>
-                  </div>
-                  <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
-                  </div>
-                </div>
-                <Progress value={92} className="mt-3 h-2" />
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Present Days</p>
-                    <p className="text-2xl font-bold">156</p>
-                  </div>
-                  <Badge className="bg-emerald-500">+5 this week</Badge>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Absent Days</p>
-                    <p className="text-2xl font-bold">8</p>
-                  </div>
-                  <Badge variant="destructive">-2 this month</Badge>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Late Arrivals</p>
-                    <p className="text-2xl font-bold">6</p>
-                  </div>
-                  <Badge variant="secondary">Acceptable</Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Attendance History */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Recent Attendance</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {attendanceData.map((day, idx) => (
-                <div key={idx} className="p-4 rounded-xl bg-muted/50 border border-border/50">
-                  <div className="flex items-center justify-between mb-3">
+          ) : summary ? (
+            <>
+              {/* rate hero */}
+              <Card className="overflow-hidden border-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
                     <div>
-                      <p className="font-semibold">{day.date}</p>
-                      <p className="text-sm text-muted-foreground">{day.day}</p>
+                      <p className="text-sm text-blue-100">Overall attendance rate</p>
+                      <p className="mt-1 text-4xl font-bold">
+                        {summary.rate !== null ? `${summary.rate}%` : "—"}
+                      </p>
+                      <p className="mt-1 text-xs text-blue-100">
+                        {formatDate(summary.from)} → {formatDate(summary.to)} ·{" "}
+                        {summary.totalDays} recorded days
+                      </p>
+                    </div>
+                    <div className="min-w-[220px] flex-1">
+                      <Progress
+                        value={summary.rate ?? 0}
+                        className="h-2.5 bg-white/20 [&>div]:bg-white"
+                      />
+                      <p className="mt-2 text-xs text-blue-100">
+                        {summary.present} present · {summary.late} late · {summary.absent} absent
+                      </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {day.subjects.map((subject, sidx) => {
-                      const config = statusConfig[subject.status as keyof typeof statusConfig]
-                      const Icon = config.icon
-                      return (
-                        <div key={sidx} className={`p-2 rounded-lg ${config.bg} flex items-center gap-2`}>
-                          <Icon className={`h-4 w-4 ${config.color}`} />
-                          <span className="text-sm font-medium truncate">{subject.name}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Stat
+                  label="Present"
+                  value={summary.present}
+                  icon={CheckCircle2}
+                  tone="emerald"
+                  hint="Including late arrivals"
+                />
+                <Stat label="Late" value={summary.late} icon={Clock} tone="amber" hint="Arrived after start" />
+                <Stat label="Absent" value={summary.absent} icon={XCircle} tone="red" hint="Unexcused" />
+                <Stat
+                  label="Excused"
+                  value={summary.excused}
+                  icon={CalendarDays}
+                  tone="blue"
+                  hint="Approved absence"
+                />
+              </div>
+
+              <div className="grid gap-5 lg:grid-cols-2">
+                <MonthlyTrend monthly={summary.monthly} />
+                <Card>
+                  <CardContent className="space-y-2 p-5">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <p className="text-sm font-semibold">How it&apos;s calculated</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      The rate counts present and late days as attended, over all recorded days
+                      (present + late + absent + excused). Holidays are excluded. A rate of 85% or
+                      above is considered good standing.
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          ) : null}
+
+          <div>
+            <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Daily records</h2>
+            <AttendanceReport hideStudentColumn={false} showSectionFilter={false} />
+          </div>
         </main>
       </div>
     </div>
   )
 }
 
-/** Shared loading fallback while the session is being verified. */
-function FullPageLoader() {
+function Stat({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  hint,
+}: {
+  label: string
+  value: number
+  icon: React.ElementType
+  tone: "emerald" | "amber" | "red" | "blue"
+  hint: string
+}) {
+  const tones = {
+    emerald: "bg-emerald-50 text-emerald-600",
+    amber: "bg-amber-50 text-amber-600",
+    red: "bg-red-50 text-red-600",
+    blue: "bg-blue-50 text-blue-600",
+  }
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
+    <Card>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl", tones[tone])}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">{label}</p>
+          <p className="text-xl font-bold">{value}</p>
+          <p className="text-[10px] text-muted-foreground">{hint}</p>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
