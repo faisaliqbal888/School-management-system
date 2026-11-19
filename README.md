@@ -1,217 +1,134 @@
 # 🎓 School Management System
 
-A modern, web-based **School Management System (SMS)** designed to digitize and streamline everyday school operations — from student admissions and attendance to grades, fees, timetables, and staff management — all in one place.
+A modern **School Management System (SMS)** that digitises school operations — students, staff,
+attendance, exams, fees, timetable, library, transport, hostel, inventory and payroll — in one
+role-based portal.
+
+> **Status:** UI complete and building green · backend in development.
+> See [`docs/PLAN.md`](docs/PLAN.md) for the full review and roadmap.
 
 ---
 
-## 📌 Table of Contents
+## 📌 Stack (decided)
 
-- [About the Project](#about-the-project)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-- [Project Structure](#project-structure)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [License](#license)
-- [Contact](#contact)
+| Layer | Choice |
+|---|---|
+| Frontend | Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · shadcn/ui · Recharts |
+| Backend | Node 20 · Express 4 · TypeScript (strict) · zod |
+| Database | PostgreSQL 16 · Prisma ORM |
+| Auth | JWT access + refresh rotation · bcrypt · role-based access control |
+| Currency / locale | PKR (Rs.) · English UI |
 
 ---
 
-## 📖 About the Project
-
-The School Management System is a comprehensive platform built to replace manual, paper-based school administration. It provides role-based access for **Admins, Teachers, Students, and Parents**, allowing each user to perform their tasks efficiently through a single dashboard.
-
-### Why this project?
-
-- Reduces paperwork and manual record-keeping
-- Centralized data for students, staff, and classes
-- Real-time attendance and result tracking
-- Transparent fee management and reporting
-- Secure, role-based access control
-
----
-
-## ✨ Features
-
-### 👨‍💼 Admin Module
-- Dashboard with school-wide statistics (total students, teachers, classes, fee collection)
-- User management (create, edit, deactivate accounts)
-- Class, section, and subject management
-- Fee structure and payment tracking
-- Generate reports (attendance, results, fee dues)
-
-### 👩‍🏫 Teacher Module
-- View assigned classes and students
-- Mark and manage student attendance
-- Enter and update student marks/results
-- View timetable and class schedule
-- Send announcements/notices to students
-
-### 👦 Student Module
-- View personal profile and class information
-- Check attendance record
-- View results and report cards
-- View timetable
-- View fee status and payment history
-
-### 👨‍👩‍👧 Parent Module
-- View linked children's profiles
-- Track attendance and results
-- View fee challans and payment status
-- Receive school announcements
-
-### 🔐 General
-- Secure login with role-based access (RBAC)
-- Responsive, mobile-friendly UI
-- Search, filter, and sort across all records
-- Export data (CSV/PDF reports)
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Frontend | HTML, CSS, JavaScript (React / Vue) |
-| Backend | Node.js + Express / Django / Laravel |
-| Database | MySQL / PostgreSQL / MongoDB |
-| Authentication | JWT / Session-based |
-| Version Control | Git & GitHub |
-
-> The exact stack can be adjusted based on project requirements — update this section once the stack is finalized.
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-Make sure you have the following installed on your machine:
-
-- [Node.js](https://nodejs.org/) (v18+) **or** Python 3.10+ (depending on backend)
-- [Git](https://git-scm.com/)
-- A database server (MySQL / PostgreSQL / MongoDB)
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/faisaliqbal888/School-management-system.git
-   cd School-management-system
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   # Backend
-   cd backend
-   npm install        # or: pip install -r requirements.txt
-
-   # Frontend
-   cd ../frontend
-   npm install
-   ```
-
-3. **Configure environment variables**
-
-   Create a `.env` file in the backend directory:
-
-   ```env
-   DB_HOST=localhost
-   DB_PORT=3306
-   DB_NAME=school_db
-   DB_USER=root
-   DB_PASSWORD=your_password
-   JWT_SECRET=your_secret_key
-   PORT=5000
-   ```
-
-4. **Set up the database**
-
-   ```bash
-   # Create the database and run migrations/seeds
-   npm run migrate
-   npm run seed
-   ```
-
-5. **Run the application**
-
-   ```bash
-   # Start backend
-   npm run dev
-
-   # Start frontend (in a new terminal)
-   npm start
-   ```
-
-6. Open your browser and visit:
-   - Frontend: `http://localhost:3000`
-   - Backend API: `http://localhost:5000`
-
----
-
-## 🗂️ Project Structure
+## 🗂️ Repository layout
 
 ```
 School-management-system/
-├── backend/
-│   ├── config/          # Database & app configuration
-│   ├── controllers/     # Route handlers / business logic
-│   ├── models/          # Database models/schemas
-│   ├── routes/          # API routes
-│   ├── middleware/      # Auth, validation, error handling
-│   └── server.js        # Entry point
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── components/  # Reusable UI components
-│   │   ├── pages/       # Page-level components
-│   │   ├── services/    # API service calls
-│   │   └── App.js       # Root component
-├── .env.example
-├── README.md
-└── LICENSE
+├── frontend/                 # Next.js app
+│   ├── app/                  # /admin, /teacher, /student, /login routes
+│   ├── components/           # UI primitives + feature components
+│   ├── lib/                  # auth context, hooks, formatters
+│   └── public/
+├── backend/                  # Express + TypeScript API  (Phase 1)
+├── docs/
+│   ├── PLAN.md               # review + roadmap (read this first)
+│   └── DECISIONS.md          # locked-in conventions
+├── .github/workflows/ci.yml  # typecheck + build on every PR
+└── package.json              # npm workspaces root
 ```
 
 ---
 
-## 📱 Usage
+## 🚀 Getting started
 
-1. **Login** with your role-based credentials (Admin / Teacher / Student / Parent).
-2. **Admins** can add classes, subjects, teachers, and students from the dashboard.
-3. **Teachers** mark daily attendance and enter exam results.
-4. **Students & Parents** view attendance, results, timetable, and fee status.
-5. **Fees** can be recorded and reports exported from the Fees section.
+```bash
+git clone https://github.com/faisaliqaliqbal888/School-management-system.git   # your fork
+cd School-management-system
+npm install                    # installs frontend + backend workspaces
+```
+
+### Frontend
+
+```bash
+cp frontend/.env.example frontend/.env.local
+npm run dev:frontend           # http://localhost:3000
+```
+
+### Backend *(available once Phase 1 lands)*
+
+```bash
+cp backend/.env.example backend/.env
+npm run dev:backend            # http://localhost:5000
+```
+
+### Demo login (temporary — removed in Phase 2)
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin` | `admin` |
+| Teacher | `teacher@gmail.com` | `teacher123` |
+| Student | `student@gmail.com` | `student123` |
 
 ---
 
-## 🤝 Contributing
+## 📦 Modules
 
-Contributions are welcome! Please follow these steps:
+| Module | Admin | Teacher | Student | Parent |
+|---|:--:|:--:|:--:|:--:|
+| Dashboard | ✅ | ✅ | ✅ | 🔜 |
+| Students | ✅ | ✅ (own classes) | — | 🔜 |
+| Teachers & Staff | ✅ | — | — | — |
+| Attendance | ✅ | ✅ | ✅ view | 🔜 |
+| Fees & Payments | ✅ | — | ✅ view | 🔜 |
+| Exams & Results | ✅ | ✅ | ✅ view | 🔜 |
+| Timetable | ✅ | ✅ | ✅ | 🔜 |
+| Library | ✅ | — | — | — |
+| Transport | ✅ | — | — | — |
+| Hostel | ✅ | — | — | — |
+| Inventory | ✅ | — | — | — |
+| HR & Payroll | ✅ | — | — | — |
+| Reports | ✅ | — | — | — |
 
-1. Fork the repository
-2. Create a new branch: `git checkout -b feature/your-feature-name`
-3. Commit your changes: `git commit -m "Add: your feature description"`
-4. Push to the branch: `git push origin feature/your-feature-name`
-5. Open a Pull Request
+✅ = built (UI) · 🔜 = planned
 
-Please make sure your code follows the existing style and includes tests where applicable.
+---
+
+## 🧑‍💻 Development
+
+```bash
+npm run typecheck      # tsc --noEmit for both packages
+npm run build          # production build
+npm run lint           # lint rules
+npm test               # backend tests
+```
+
+CI runs typecheck + build for the frontend and typecheck + tests for the backend on every PR.
+
+---
+
+## 🗺️ Roadmap
+
+| Phase | Scope |
+|---|---|
+| 0 ✅ | Restructure, build fixes, security upgrade, CI |
+| 1 | Backend foundation, Prisma schema, seed |
+| 2 | Real auth, RBAC, parent role |
+| 3 | Students, teachers, classes, attendance, fees (full CRUD) |
+| 4 | Exams, timetable, notifications, library, transport, hostel, inventory, HR |
+| 5 | Live dashboards, reports, CSV/PDF exports |
+| 6 | Mobile drawer, loading states, image optimisation, remove demo data |
+| 7 | Tests, security pass, deployment |
+
+Full detail: [`docs/PLAN.md`](docs/PLAN.md)
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
+MIT
 
 ## 📬 Contact
 
-- **GitHub:** [@faisaliqbal888](https://github.com/faisaliqbal888)
-- **Project Link:** [https://github.com/faisaliqbal888/School-management-system](https://github.com/faisaliqbal888/School-management-system)
-
----
-
-⭐ If you find this project useful, don't forget to give it a star!
+- GitHub: [@faisaliqbal888](https://github.com/faisaliqbal888)
+- Project: [faisaliqbal888/School-management-system](https://github.com/faisaliqbal888/School-management-system)
