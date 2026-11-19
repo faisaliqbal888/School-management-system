@@ -1,8 +1,7 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
 import { StudentStats } from "@/components/student/student-stats"
@@ -15,25 +14,10 @@ import { Loader2 } from "lucide-react"
 
 export default function StudentDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "student")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("STUDENT")
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (!isAuthenticated || user?.role !== "student") {
-    return null
-  }
+  if (!ready) return <FullPageLoader />
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,7 +32,7 @@ export default function StudentDashboard() {
                 Welcome back, {user?.name?.split(" ")[0]}!
               </h1>
               <p className="text-muted-foreground">
-                Class {user?.class}-{user?.section} | Roll No: {user?.rollNo} | Admission: {user?.admissionNo}
+                Class {user?.class || "—"}-{user?.section || "—"} | Roll No: {user?.rollNo} | Admission: {user?.admissionNo}
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -78,6 +62,15 @@ export default function StudentDashboard() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

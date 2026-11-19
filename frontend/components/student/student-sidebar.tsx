@@ -132,14 +132,14 @@ export function StudentSidebar() {
         <div className="border-t border-white/20 p-3">
           <div className={cn("flex items-center gap-3 rounded-xl bg-white/10 p-2", collapsed && "justify-center")}>
             <Avatar className="h-9 w-9 ring-2 ring-white/30">
-              <AvatarImage src={user?.avatar || "/placeholder.svg"} />
+              <AvatarImage src={user?.avatarUrl || "/placeholder.svg"} />
               <AvatarFallback className="bg-white text-blue-600 text-sm">{user?.name?.charAt(0) || "S"}</AvatarFallback>
             </Avatar>
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{user?.name || "Student"}</p>
                 <p className="text-xs text-white/60 truncate">
-                  Class {user?.class}-{user?.section}
+                  Class {user?.class || "—"}-{user?.section || "—"}
                 </p>
               </div>
             )}
@@ -147,7 +147,7 @@ export function StudentSidebar() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={logout}
+                onClick={() => void logout()}
                 className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/20"
               >
                 <LogOut className="h-4 w-4" />

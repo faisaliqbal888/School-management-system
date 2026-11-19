@@ -1,9 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { StudentTable, type Student } from "@/components/students/student-table"
@@ -46,28 +45,13 @@ const stats = [
 
 export default function AdminStudentsPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "admin")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("ADMIN")
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (!isAuthenticated || user?.role !== "admin") {
-    return null
-  }
+  if (!ready) return <FullPageLoader />
 
   const handleViewStudent = (student: Student) => {
     setSelectedStudent(student)
@@ -129,6 +113,15 @@ export default function AdminStudentsPage() {
           <StudentDetailModal student={selectedStudent} open={detailModalOpen} onOpenChange={setDetailModalOpen} />
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

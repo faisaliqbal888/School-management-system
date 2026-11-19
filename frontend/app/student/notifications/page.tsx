@@ -1,8 +1,8 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
 import { Card, CardContent } from "@/components/ui/card"
@@ -84,14 +84,9 @@ const colorMap = {
 
 export default function StudentNotificationsPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [notificationList, setNotificationList] = useState(notifications)
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "student")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("STUDENT")
 
   const markAllAsRead = () => {
     setNotificationList((prev) => prev.map((n) => ({ ...n, read: true })))
@@ -101,13 +96,7 @@ export default function StudentNotificationsPage() {
     setNotificationList((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)))
   }
 
-  if (isLoading || !isAuthenticated || user?.role !== "student") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!ready) return <FullPageLoader />
 
   const unreadCount = notificationList.filter((n) => !n.read).length
 
@@ -264,6 +253,15 @@ export default function StudentNotificationsPage() {
           </Tabs>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

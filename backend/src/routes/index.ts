@@ -5,7 +5,7 @@ import { Router } from 'express'
  *
  * Every module file exports a router mounted here. Modules land progressively:
  *   Phase 1 → academic years, classes, sections, subjects   (this commit)
- *   Phase 2 → auth (login/refresh/logout/me)
+ *   Phase 2 → auth ✅ login/refresh/logout/me/change-password · parent role
  *   Phase 3 → students, teachers, attendance, fees
  *   Phase 4 → exams, timetable, notifications, library, transport, hostel,
  *             inventory, payroll
@@ -16,6 +16,9 @@ import { Router } from 'express'
  */
 export const apiRouter = Router()
 
-// Implemented in this phase
+// ── implemented ───────────────────────────────────────────
+import { authRouter } from './auth.routes.js'
 import { academicRouter } from './academic.routes.js'
+
+apiRouter.use(authRouter)
 apiRouter.use(academicRouter)

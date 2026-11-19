@@ -1,8 +1,8 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -85,7 +85,6 @@ const existingUsers = [
 
 export default function AdminUsersPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [roleFilter, setRoleFilter] = useState("all")
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -99,11 +98,7 @@ export default function AdminUsersPage() {
   const [generatedCredentials, setGeneratedCredentials] = useState<{ email: string; password: string } | null>(null)
   const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "admin")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("ADMIN")
 
   const handleCreateUser = () => {
     const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`
@@ -129,13 +124,7 @@ export default function AdminUsersPage() {
     return matchesSearch && matchesRole
   })
 
-  if (isLoading || !isAuthenticated || user?.role !== "admin") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!ready) return <FullPageLoader />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-violet-50/20">
@@ -401,6 +390,15 @@ export default function AdminUsersPage() {
           </Card>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

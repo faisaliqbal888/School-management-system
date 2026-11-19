@@ -1,8 +1,8 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
 import { Card, CardContent } from "@/components/ui/card"
@@ -85,15 +85,10 @@ const allStudents = [
 
 export default function TeacherStudentsPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [selectedClass, setSelectedClass] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "teacher")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("TEACHER")
 
   const filteredStudents = allStudents.filter((student) => {
     const matchesClass = selectedClass === "all" || student.class === selectedClass
@@ -101,13 +96,7 @@ export default function TeacherStudentsPage() {
     return matchesClass && matchesSearch
   })
 
-  if (isLoading || !isAuthenticated || user?.role !== "teacher") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!ready) return <FullPageLoader />
 
   return (
     <div className="min-h-screen bg-background">
@@ -281,6 +270,15 @@ export default function TeacherStudentsPage() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

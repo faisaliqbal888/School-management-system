@@ -1,8 +1,8 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -61,14 +61,9 @@ const invoices = [
 
 export default function StudentFeesPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [processingPayment, setProcessingPayment] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "student")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("STUDENT")
 
   const handlePayment = async (invoiceId: string) => {
     setProcessingPayment(invoiceId)
@@ -78,13 +73,7 @@ export default function StudentFeesPage() {
     alert("Payment gateway would open here. This is a demo.")
   }
 
-  if (isLoading || !isAuthenticated || user?.role !== "student") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!ready) return <FullPageLoader />
 
   const unpaidTotal = invoices.filter((i) => i.status === "unpaid").reduce((sum, i) => sum + i.total, 0)
   const paidTotal = invoices.filter((i) => i.status === "paid").reduce((sum, i) => sum + i.total, 0)
@@ -234,6 +223,15 @@ export default function StudentFeesPage() {
           </Card>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

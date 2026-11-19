@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
@@ -18,25 +17,10 @@ const reports = [
 
 export default function AdminReportsPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "admin")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("ADMIN")
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (!isAuthenticated || user?.role !== "admin") {
-    return null
-  }
+  if (!ready) return <FullPageLoader />
 
   return (
     <div className="min-h-screen bg-background">
@@ -75,6 +59,15 @@ export default function AdminReportsPage() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

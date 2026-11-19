@@ -81,13 +81,7 @@ so it works in restricted CI/sandbox environments. Details: [`backend/README.md`
 | Student | `student@ravischool.edu.pk` |
 | Parent | `parent@ravischool.edu.pk` |
 
-**Frontend demo login** (temporary, until Phase 2 wires the real API):
-
-| Role | Email | Password |
-|---|---|---|
-| Admin | `admin` | `admin` |
-| Teacher | `teacher@gmail.com` | `teacher123` |
-| Student | `student@gmail.com` | `student123` |
+The login page has one-click buttons for all four accounts.
 
 ---
 
@@ -95,7 +89,7 @@ so it works in restricted CI/sandbox environments. Details: [`backend/README.md`
 
 | Module | Admin | Teacher | Student | Parent |
 |---|:--:|:--:|:--:|:--:|
-| Dashboard | ✅ | ✅ | ✅ | 🔜 |
+| Dashboard | ✅ | ✅ | ✅ | ✅ |
 | Students | ✅ | ✅ (own classes) | — | 🔜 |
 | Teachers & Staff | ✅ | — | — | — |
 | Attendance | ✅ | ✅ | ✅ view | 🔜 |
@@ -132,7 +126,7 @@ CI runs typecheck + build for the frontend and typecheck + tests for the backend
 |---|---|---|:--:|
 | 0 | Restructure, build fixes, security upgrade, CI | ✅ |
 | 1 | Backend foundation, 34-model schema, migrations, seed, academic API | ✅ |
-| 2 | Real auth (JWT + refresh), RBAC, parent role, frontend login | 🔜 |
+| 2 | Real auth (JWT + refresh), RBAC, parent role, frontend login | ✅ |
 | 3 | Students, teachers, attendance, fees — full CRUD + frontend wiring | 🔜 |
 | 4 | Exams, timetable, notifications, library, transport, hostel, inventory, HR | 🔜 |
 | 5 | Live dashboards, reports, CSV/PDF exports | 🔜 |

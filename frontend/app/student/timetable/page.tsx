@@ -1,11 +1,13 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Clock, MapPin, User, BookOpen } from "lucide-react"
+import { Clock, MapPin, User, BookOpen, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -84,6 +86,10 @@ const typeColors = {
 }
 
 export default function StudentTimetablePage() {
+  const { ready } = useRequireRole("STUDENT")
+
+  if (!ready) return <FullPageLoader />
+
   const [selectedDay, setSelectedDay] = useState("Monday")
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" })
   const currentDay = days.includes(today) ? today : "Monday"
@@ -247,6 +253,14 @@ export default function StudentTimetablePage() {
           </Card>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

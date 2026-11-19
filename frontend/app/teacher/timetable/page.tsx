@@ -1,12 +1,14 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Clock, MapPin, Users, BookOpen, Calendar } from "lucide-react"
+import { Clock, MapPin, Users, BookOpen, Calendar, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -84,6 +86,10 @@ const typeStyles = {
 }
 
 export default function TeacherTimetablePage() {
+  const { ready } = useRequireRole("TEACHER")
+
+  if (!ready) return <FullPageLoader />
+
   const [selectedDay, setSelectedDay] = useState("Monday")
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" })
   const currentDay = days.includes(today) ? today : "Monday"
@@ -235,6 +241,14 @@ export default function TeacherTimetablePage() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

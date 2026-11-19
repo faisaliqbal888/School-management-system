@@ -1,5 +1,7 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
@@ -8,7 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Users, BookOpen, TrendingUp, Clock, Calendar, ChevronRight, FileText, ClipboardCheck } from "lucide-react"
+import { Users, BookOpen, TrendingUp, Clock, Calendar, ChevronRight, FileText, ClipboardCheck, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const myClasses = [
@@ -100,6 +102,10 @@ const upcomingSyllabus = [
 ]
 
 export default function TeacherClassesPage() {
+  const { ready } = useRequireRole("TEACHER")
+
+  if (!ready) return <FullPageLoader />
+
   const [selectedClass, setSelectedClass] = useState(myClasses[0])
 
   return (
@@ -356,6 +362,14 @@ export default function TeacherClassesPage() {
           </Card>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

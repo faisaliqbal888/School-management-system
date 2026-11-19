@@ -1,8 +1,8 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,7 +58,6 @@ const sentNotifications = [
 
 export default function AdminNotificationsPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [notification, setNotification] = useState({
     title: "",
@@ -68,11 +67,7 @@ export default function AdminNotificationsPage() {
   })
   const [sending, setSending] = useState(false)
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "admin")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("ADMIN")
 
   const handleSend = async () => {
     setSending(true)
@@ -88,13 +83,7 @@ export default function AdminNotificationsPage() {
     })
   }
 
-  if (isLoading || !isAuthenticated || user?.role !== "admin") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!ready) return <FullPageLoader />
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-cyan-50/20">
@@ -298,6 +287,15 @@ export default function AdminNotificationsPage() {
           </Card>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

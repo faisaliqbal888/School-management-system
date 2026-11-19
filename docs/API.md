@@ -39,6 +39,56 @@ Every endpoint returns one of these two shapes.
 
 ## Authentication
 
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/auth/login` | — (rate-limited 10/15min) | `{ email, password }` → `{ user, accessToken, refreshToken }` + httpOnly cookies |
+| POST | `/auth/refresh` | refresh token | Rotates the pair; reuse revokes every session for that user |
+| POST | `/auth/logout` | access token | Revokes the refresh token and clears cookies → 204 |
+| GET | `/auth/me` | access token | Current user + role profile |
+| POST | `/auth/change-password` | access token | `{ currentPassword, newPassword, confirmPassword }`, signs out other devices |
+
+### Tokens
+
+- **Access token** — JWT, 15 min, sent as `Authorization: Bearer …` *or* the
+  `access_token` httpOnly cookie (browsers).
+- **Refresh token** — 48 random bytes, stored only as a SHA-256 hash, 7 days,
+  `refresh_token` httpOnly cookie scoped to `/api/v1/auth`.
+- **Rotation** — every refresh revokes the old token. Presenting an already-used
+  token is treated as theft: all sessions for that user are revoked and an
+  `auth.refresh_reuse` audit entry is written.
+
+Login failures always return the same message (`Invalid email or password`) so
+accounts cannot be enumerated.
+
+### Session payload
+
+```json
+{
+  "user": {
+    "id": "…", "email": "student@ravischool.edu.pk", "name": "Anaya Abbasi",
+    "role": "STUDENT", "phone": "+92…", "avatarUrl": "/emma-student.jpg",
+    "profile": {
+      "studentId": "…", "admissionNo": "ADM-2025-0001", "rollNo": "6A01",
+      "classId": "…", "className": "Grade 6", "level": 6,
+      "sectionId": "…", "sectionName": "A", "status": "ACTIVE"
+    }
+  }
+}
+```
+
+`profile` depends on the role:
+
+| Role | `profile` keys |
+|---|---|
+| `STUDENT` | `studentId, admissionNo, rollNo, classId, className, level, sectionId, sectionName, status` |
+| `TEACHER` | `teacherId, employeeNo, department, designation, status, subjects[], classTeacherOf` |
+| `PARENT` | `parentId, children[{ studentId, name, admissionNo, className }]` |
+| `ADMIN` | `isAdmin: true` |
+
+### Using a token
+
 Send the access token on every protected request:
 
 ```
@@ -124,8 +174,8 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 ## Roadmap for the API surface
 
 | Phase | Adds |
-|---|---|
-| 2 | `/auth/*` (login, refresh, logout, me) |
+|---|---|---|
+| 2 ✅ | `/auth/*` (login, refresh, logout, me, change-password) · parent role |
 | 3 | `/students`, `/teachers`, `/attendance`, `/invoices`, `/payments` |
 | 4 | `/exams`, `/results`, `/timetable`, `/notifications`, `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` |
 | 5 | `/dashboard/summary`, `/reports/*` |

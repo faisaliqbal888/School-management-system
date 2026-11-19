@@ -24,7 +24,7 @@ export function StudentHeader() {
       <div className="flex items-center gap-3">
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 dark:bg-blue-950">
           <span className="text-xs text-muted-foreground">Roll No:</span>
-          <span className="text-sm font-semibold text-blue-600">{user?.rollNo || "15"}</span>
+          <span className="text-sm font-semibold text-blue-600">{user?.rollNo || "—"}</span>
         </div>
 
         <Button variant="ghost" size="icon" className="relative">

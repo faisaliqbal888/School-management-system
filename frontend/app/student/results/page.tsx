@@ -1,8 +1,8 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,22 +33,11 @@ const resultsData = {
 
 export default function StudentResultsPage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [selectedExam, setSelectedExam] = useState("Mid-Term 2024")
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "student")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("STUDENT")
 
-  if (isLoading || !isAuthenticated || user?.role !== "student") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!ready) return <FullPageLoader />
 
   const result = resultsData[selectedExam as keyof typeof resultsData]
 
@@ -192,6 +181,15 @@ export default function StudentResultsPage() {
           )}
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

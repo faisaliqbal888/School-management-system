@@ -1,5 +1,7 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
@@ -12,10 +14,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { useAuth } from "@/lib/auth-context"
-import { User, Mail, Phone, MapPin, Calendar, BookOpen, Award, Camera, Edit3, Save, Shield, Bell } from "lucide-react"
+import { User, Mail, Phone, MapPin, Calendar, BookOpen, Award, Camera, Edit3, Save, Shield, Bell, Loader2 } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 
 export default function StudentProfilePage() {
+  const { ready } = useRequireRole("STUDENT")
+
+  if (!ready) return <FullPageLoader />
+
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
 
@@ -347,6 +353,14 @@ export default function StudentProfilePage() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

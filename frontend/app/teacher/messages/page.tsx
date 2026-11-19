@@ -1,5 +1,7 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
@@ -10,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, Send, Paperclip, MoreVertical, Phone, Video, Users } from "lucide-react"
+import { Search, Send, Paperclip, MoreVertical, Phone, Video, Users, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const conversations = [
@@ -107,6 +109,10 @@ const messages = [
 ]
 
 export default function TeacherMessagesPage() {
+  const { ready } = useRequireRole("TEACHER")
+
+  if (!ready) return <FullPageLoader />
+
   const [selectedConversation, setSelectedConversation] = useState(conversations[0])
   const [newMessage, setNewMessage] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
@@ -273,6 +279,14 @@ export default function TeacherMessagesPage() {
           </Card>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

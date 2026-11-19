@@ -1,6 +1,6 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
@@ -53,17 +53,12 @@ const studentsData: Record<
 
 export default function TeacherAttendancePage() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
   const [selectedClass, setSelectedClass] = useState("10-A")
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
   const [students, setStudents] = useState(studentsData["10-A"])
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "teacher")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("TEACHER")
 
   useEffect(() => {
     setStudents(studentsData[selectedClass] || [])
@@ -90,13 +85,7 @@ export default function TeacherAttendancePage() {
   const absentCount = students.filter((s) => s.status === "absent").length
   const lateCount = students.filter((s) => s.status === "late").length
 
-  if (isLoading || !isAuthenticated || user?.role !== "teacher") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (!ready) return <FullPageLoader />
 
   const selectedClassInfo = classes.find((c) => c.id === selectedClass)
 
@@ -266,6 +255,15 @@ export default function TeacherAttendancePage() {
           </Card>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

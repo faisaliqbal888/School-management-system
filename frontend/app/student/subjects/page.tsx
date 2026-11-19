@@ -1,5 +1,7 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
@@ -9,7 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Clock, TrendingUp, FileText, Video, Download, CheckCircle2, Circle } from "lucide-react"
+import { BookOpen, Clock, TrendingUp, FileText, Video, Download, CheckCircle2, Circle, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const subjects = [
@@ -137,6 +139,10 @@ const subjects = [
 ]
 
 export default function StudentSubjectsPage() {
+  const { ready } = useRequireRole("STUDENT")
+
+  if (!ready) return <FullPageLoader />
+
   const [selectedSubject, setSelectedSubject] = useState(subjects[0])
 
   return (
@@ -351,6 +357,14 @@ export default function StudentSubjectsPage() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

@@ -93,7 +93,7 @@ School-management-system/
 - Migrations + realistic seed (Pakistan-context, PKR)
 - Health check, error envelope, request logging, `docs/API.md`
 
-### Phase 2 — Auth & RBAC (days 12–15)
+### Phase 2 — Auth & RBAC ✅ COMPLETE
 - bcrypt hashing, JWT access tokens + refresh rotation
 - `authenticate` + `authorize(roles)` middleware
 - **Parent role** added end-to-end

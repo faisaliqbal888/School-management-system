@@ -1,5 +1,7 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
@@ -27,12 +29,14 @@ import {
   GraduationCap,
   BookOpen,
   Users,
-  Clock,
-} from "lucide-react"
+  Clock, Loader2 } from "lucide-react"
 
 export default function TeacherProfilePage() {
   const { user } = useAuth()
+  const { ready } = useRequireRole("TEACHER")
   const [isEditing, setIsEditing] = useState(false)
+
+  if (!ready) return <FullPageLoader />
 
   const teacherInfo = {
     name: user?.name || "Mr. Sharma",
@@ -373,6 +377,14 @@ export default function TeacherProfilePage() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

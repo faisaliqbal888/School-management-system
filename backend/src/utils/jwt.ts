@@ -38,12 +38,23 @@ export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
+/** "15m" → 900000 · "7d" → 604800000 · malformed → fallback */
+export function parseDurationMs(raw: string, fallbackMs: number): number {
+  const match = /^(\d+)\s*([smhd])$/.exec(raw.trim())
+  if (!match) return fallbackMs
+  const amount = Number(match[1])
+  const unitMs: Record<string, number> = { s: 1_000, m: 60_000, h: 3_600_000, d: 86_400_000 }
+  return amount * (unitMs[match[2] as string] ?? fallbackMs)
+}
+
+export function accessExpiryMs(): number {
+  return parseDurationMs(config.jwt.accessExpiresIn, 15 * 60 * 1000)
+}
+
+export function refreshExpiryMs(): number {
+  return parseDurationMs(config.jwt.refreshExpiresIn, 7 * 24 * 60 * 60 * 1000)
+}
+
 export function refreshExpiryDate(): Date {
-  const raw = config.jwt.refreshExpiresIn
-  const match = /^(\d+)([smhd])$/.exec(raw)
-  if (!match) return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  const [, amountRaw, unit] = match
-  const amount = Number(amountRaw)
-  const ms: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 }
-  return new Date(Date.now() + amount * (ms[unit as string] ?? 86_400_000))
+  return new Date(Date.now() + refreshExpiryMs())
 }

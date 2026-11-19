@@ -1,8 +1,7 @@
 "use client"
 
-import { useAuth } from "@/lib/auth-context"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
-import { useEffect } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
 import { TeacherStats } from "@/components/teacher/teacher-stats"
@@ -13,25 +12,10 @@ import { Loader2 } from "lucide-react"
 
 export default function TeacherDashboard() {
   const { user, isLoading, isAuthenticated } = useAuth()
-  const router = useRouter()
 
-  useEffect(() => {
-    if (!isLoading && (!isAuthenticated || user?.role !== "teacher")) {
-      router.push("/login")
-    }
-  }, [isLoading, isAuthenticated, user, router])
+  const { ready } = useRequireRole("TEACHER")
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  if (!isAuthenticated || user?.role !== "teacher") {
-    return null
-  }
+  if (!ready) return <FullPageLoader />
 
   return (
     <div className="min-h-screen bg-background">
@@ -46,7 +30,7 @@ export default function TeacherDashboard() {
                 Welcome back, {user?.name?.split(" ")[0]}!
               </h1>
               <p className="text-muted-foreground">
-                {user?.department} Department | Staff ID: {user?.staffNo}
+                {user?.department || "—"} Department | Staff ID: {user?.staffNo || "—"}
               </p>
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -74,6 +58,15 @@ export default function TeacherDashboard() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+/** Shared loading fallback while the session is being verified. */
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

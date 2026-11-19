@@ -1,5 +1,7 @@
 "use client"
 
+import { useRequireRole } from "@/lib/auth-context"
+
 import { useState } from "react"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
@@ -20,6 +22,7 @@ import {
   Settings,
   Trash2,
   Check,
+  Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -115,6 +118,10 @@ const notifications = [
 ]
 
 export default function TeacherNotificationsPage() {
+  const { ready } = useRequireRole("TEACHER")
+
+  if (!ready) return <FullPageLoader />
+
   const [notificationList, setNotificationList] = useState(notifications)
   const [filter, setFilter] = useState("all")
 
@@ -290,6 +297,14 @@ export default function TeacherNotificationsPage() {
           </div>
         </main>
       </div>
+    </div>
+  )
+}
+
+function FullPageLoader() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }
