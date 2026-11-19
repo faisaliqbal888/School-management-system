@@ -22,9 +22,11 @@ import { academicRouter } from './academic.routes.js'
 import { studentsRouter } from './students.routes.js'
 import { teachersRouter } from './teachers.routes.js'
 import { attendanceRouter } from './attendance.routes.js'
+import { feesRouter } from './fees.routes.js'
 
 apiRouter.use(authRouter)
 apiRouter.use(academicRouter)
 apiRouter.use(studentsRouter)
 apiRouter.use(teachersRouter)
 apiRouter.use(attendanceRouter)
+apiRouter.use(feesRouter)

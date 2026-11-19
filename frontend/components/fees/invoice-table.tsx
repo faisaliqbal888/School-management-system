@@ -1,277 +1,192 @@
 "use client"
 
-import { useState } from "react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Eye, Printer, Send, CreditCard } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Eye, Receipt, ReceiptText, Wallet } from "lucide-react"
+import { formatDate, formatPKR } from "@/lib/format"
+import type { InvoiceRow, InvoiceStatus } from "@/lib/hooks/use-fees"
 import { cn } from "@/lib/utils"
 
-export interface Invoice {
-  id: string
-  invoiceNo: string
-  studentName: string
-  studentAvatar?: string
-  class: string
-  items: { name: string; amount: number }[]
-  totalAmount: number
-  paidAmount: number
-  dueDate: string
-  status: "Paid" | "Pending" | "Overdue" | "Partial"
+const STATUS_STYLES: Record<InvoiceStatus, string> = {
+  PENDING: "bg-amber-50 text-amber-700 border-amber-200",
+  PARTIAL: "bg-blue-50 text-blue-700 border-blue-200",
+  PAID: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  OVERDUE: "bg-red-50 text-red-700 border-red-200",
+  CANCELLED: "bg-slate-100 text-slate-600 border-slate-200",
+  WAIVED: "bg-violet-50 text-violet-700 border-violet-200",
 }
-
-const invoices: Invoice[] = [
-  {
-    id: "1",
-    invoiceNo: "INV-2025-001",
-    studentName: "Ali Khan",
-    studentAvatar: "/student-boy-portrait.jpg",
-    class: "8-A",
-    items: [
-      { name: "Tuition Fee", amount: 1500 },
-      { name: "Lab Fee", amount: 200 },
-      { name: "Library Fee", amount: 100 },
-    ],
-    totalAmount: 1800,
-    paidAmount: 1800,
-    dueDate: "2025-12-15",
-    status: "Paid",
-  },
-  {
-    id: "2",
-    invoiceNo: "INV-2025-002",
-    studentName: "Sara Ahmed",
-    studentAvatar: "/student-girl-portrait.jpg",
-    class: "9-B",
-    items: [
-      { name: "Tuition Fee", amount: 1600 },
-      { name: "Lab Fee", amount: 200 },
-    ],
-    totalAmount: 1800,
-    paidAmount: 0,
-    dueDate: "2025-12-15",
-    status: "Pending",
-  },
-  {
-    id: "3",
-    invoiceNo: "INV-2025-003",
-    studentName: "Omar Hassan",
-    studentAvatar: "/student-boy-portrait-child.jpg",
-    class: "7-C",
-    items: [
-      { name: "Tuition Fee", amount: 1400 },
-      { name: "Sports Fee", amount: 300 },
-    ],
-    totalAmount: 1700,
-    paidAmount: 850,
-    dueDate: "2025-12-10",
-    status: "Partial",
-  },
-  {
-    id: "4",
-    invoiceNo: "INV-2025-004",
-    studentName: "Fatima Ali",
-    studentAvatar: "/student-girl-portrait-teen.jpg",
-    class: "10-A",
-    items: [
-      { name: "Tuition Fee", amount: 1800 },
-      { name: "Exam Fee", amount: 500 },
-    ],
-    totalAmount: 2300,
-    paidAmount: 0,
-    dueDate: "2025-11-30",
-    status: "Overdue",
-  },
-  {
-    id: "5",
-    invoiceNo: "INV-2025-005",
-    studentName: "Yusuf Ibrahim",
-    studentAvatar: "/student-boy-portrait-young.jpg",
-    class: "6-B",
-    items: [
-      { name: "Tuition Fee", amount: 1200 },
-      { name: "Activity Fee", amount: 200 },
-    ],
-    totalAmount: 1400,
-    paidAmount: 1400,
-    dueDate: "2025-12-15",
-    status: "Paid",
-  },
-  {
-    id: "6",
-    invoiceNo: "INV-2025-006",
-    studentName: "Ayesha Malik",
-    class: "8-B",
-    items: [
-      { name: "Tuition Fee", amount: 1500 },
-      { name: "Transport Fee", amount: 400 },
-    ],
-    totalAmount: 1900,
-    paidAmount: 1900,
-    dueDate: "2025-12-15",
-    status: "Paid",
-  },
-]
 
 interface InvoiceTableProps {
-  onViewInvoice?: (invoice: Invoice) => void
-  onRecordPayment?: (invoice: Invoice) => void
+  invoices: InvoiceRow[]
+  isLoading?: boolean
+  error?: string | null
+  onViewInvoice?: (invoice: InvoiceRow) => void
+  onRecordPayment?: (invoice: InvoiceRow) => void
+  /** Hide the student column (student/parent views). */
+  hideStudent?: boolean
+  /** Show the record-payment action (admin only). */
+  canRecordPayment?: boolean
 }
 
-export function InvoiceTable({ onViewInvoice, onRecordPayment }: InvoiceTableProps) {
-  const [selectedInvoices, setSelectedInvoices] = useState<string[]>([])
-
-  const toggleSelectAll = () => {
-    if (selectedInvoices.length === invoices.length) {
-      setSelectedInvoices([])
-    } else {
-      setSelectedInvoices(invoices.map((i) => i.id))
-    }
+export function InvoiceTable({
+  invoices,
+  isLoading = false,
+  error = null,
+  onViewInvoice,
+  onRecordPayment,
+  hideStudent = false,
+  canRecordPayment = false,
+}: InvoiceTableProps) {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="ml-auto h-4 w-24" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    )
   }
 
-  const toggleSelectInvoice = (id: string) => {
-    setSelectedInvoices((prev) => (prev.includes(id) ? prev.filter((iid) => iid !== id) : [...prev, id]))
+  if (error) {
+    return (
+      <Card className="border-destructive/30 bg-destructive/5">
+        <CardContent className="py-8 text-center text-sm text-destructive">{error}</CardContent>
+      </Card>
+    )
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Paid":
-        return "bg-success/10 text-success hover:bg-success/20"
-      case "Pending":
-        return "bg-warning/10 text-warning hover:bg-warning/20"
-      case "Overdue":
-        return "bg-destructive/10 text-destructive hover:bg-destructive/20"
-      case "Partial":
-        return "bg-primary/10 text-primary hover:bg-primary/20"
-      default:
-        return "bg-muted text-muted-foreground"
-    }
+  if (invoices.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <ReceiptText className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <p className="font-medium">No invoices found</p>
+          <p className="text-sm text-muted-foreground">
+            Adjust the filters or raise a new invoice to get started.
+          </p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="w-12">
-              <Checkbox checked={selectedInvoices.length === invoices.length} onCheckedChange={toggleSelectAll} />
-            </TableHead>
-            <TableHead>Invoice</TableHead>
-            <TableHead>Student</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Paid</TableHead>
-            <TableHead>Due Date</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {invoices.map((invoice) => (
-            <TableRow
-              key={invoice.id}
-              className={cn("group transition-colors", selectedInvoices.includes(invoice.id) && "bg-primary/5")}
-            >
-              <TableCell>
-                <Checkbox
-                  checked={selectedInvoices.includes(invoice.id)}
-                  onCheckedChange={() => toggleSelectInvoice(invoice.id)}
-                />
-              </TableCell>
-              <TableCell>
-                <span className="font-mono text-sm font-medium">{invoice.invoiceNo}</span>
-              </TableCell>
-              <TableCell>
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarImage src={invoice.studentAvatar || "/placeholder.svg"} alt={invoice.studentName} />
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {invoice.studentName
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium text-sm">{invoice.studentName}</p>
-                    <p className="text-xs text-muted-foreground">Class {invoice.class}</p>
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell>
-                <span className="font-semibold">${invoice.totalAmount.toLocaleString()}</span>
-              </TableCell>
-              <TableCell>
-                <span
+    <Card className="overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left">
+            <tr>
+              <th className="px-4 py-3 font-medium">Invoice</th>
+              {!hideStudent && <th className="px-4 py-3 font-medium">Student</th>}
+              <th className="px-4 py-3 text-right font-medium">Total</th>
+              <th className="px-4 py-3 text-right font-medium">Paid</th>
+              <th className="px-4 py-3 text-right font-medium">Balance</th>
+              <th className="px-4 py-3 font-medium">Due</th>
+              <th className="px-4 py-3 font-medium">Status</th>
+              <th className="px-4 py-3 text-right font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoices.map((invoice) => (
+              <tr key={invoice.id} className="border-t border-border hover:bg-muted/20">
+                <td className="px-4 py-3">
+                  <p className="font-mono text-xs">{invoice.invoiceNo}</p>
+                  <p className="mt-0.5 font-medium">{invoice.title}</p>
+                  {invoice.period && (
+                    <p className="text-xs text-muted-foreground">{invoice.period}</p>
+                  )}
+                </td>
+
+                {!hideStudent && (
+                  <td className="px-4 py-3">
+                    <p className="font-medium">{invoice.studentName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {invoice.className}
+                      {invoice.sectionName ? `-${invoice.sectionName}` : ""} · {invoice.admissionNo}
+                    </p>
+                  </td>
+                )}
+
+                <td className="whitespace-nowrap px-4 py-3 text-right font-medium">
+                  {formatPKR(invoice.totalAmount)}
+                  {(invoice.discount > 0 || invoice.fine > 0) && (
+                    <p className="text-[10px] font-normal text-muted-foreground">
+                      {invoice.discount > 0 ? `−${formatPKR(invoice.discount)} discount` : ""}
+                      {invoice.discount > 0 && invoice.fine > 0 ? " · " : ""}
+                      {invoice.fine > 0 ? `+${formatPKR(invoice.fine)} fine` : ""}
+                    </p>
+                  )}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-right text-emerald-700">
+                  {formatPKR(invoice.paidAmount)}
+                </td>
+                <td
                   className={cn(
-                    "font-medium",
-                    invoice.paidAmount === invoice.totalAmount
-                      ? "text-success"
-                      : invoice.paidAmount > 0
-                        ? "text-primary"
-                        : "text-muted-foreground",
+                    "whitespace-nowrap px-4 py-3 text-right font-medium",
+                    invoice.balance > 0 ? "text-red-600" : "text-muted-foreground",
                   )}
                 >
-                  ${invoice.paidAmount.toLocaleString()}
-                </span>
-              </TableCell>
-              <TableCell>
-                <span className="text-sm">{new Date(invoice.dueDate).toLocaleDateString()}</span>
-              </TableCell>
-              <TableCell>
-                <Badge className={cn("border-0", getStatusColor(invoice.status))}>{invoice.status}</Badge>
-              </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  {formatPKR(invoice.balance)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                  {formatDate(invoice.dueDate)}
+                </td>
+                <td className="px-4 py-3">
+                  <Badge variant="outline" className={cn("text-[10px]", STATUS_STYLES[invoice.status])}>
+                    {invoice.status}
+                  </Badge>
+                  {invoice.paymentsCount > 0 && (
+                    <p className="mt-1 text-[10px] text-muted-foreground">
+                      {invoice.paymentsCount} payment{invoice.paymentsCount === 1 ? "" : "s"}
+                    </p>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex justify-end gap-1">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={() => onViewInvoice?.(invoice)}
+                      title="View invoice"
                     >
-                      <MoreHorizontal className="h-4 w-4" />
+                      <Eye className="h-4 w-4" />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => onViewInvoice?.(invoice)}>
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Invoice
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Printer className="mr-2 h-4 w-4" />
-                      Print Invoice
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <Send className="mr-2 h-4 w-4" />
-                      Send Reminder
-                    </DropdownMenuItem>
-                    {invoice.status !== "Paid" && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => onRecordPayment?.(invoice)}>
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          Record Payment
-                        </DropdownMenuItem>
-                      </>
+                    {canRecordPayment && invoice.balance > 0 && invoice.status !== "WAIVED" && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onRecordPayment?.(invoice)}
+                        title="Record payment"
+                        className="text-emerald-600 hover:text-emerald-700"
+                      >
+                        <Wallet className="h-4 w-4" />
+                      </Button>
                     )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  )
+}
+
+export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
+  return (
+    <Badge variant="outline" className={cn("text-[10px]", STATUS_STYLES[status])}>
+      <Receipt className="mr-1 h-3 w-3" />
+      {status}
+    </Badge>
   )
 }

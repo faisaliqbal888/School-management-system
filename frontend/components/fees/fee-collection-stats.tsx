@@ -2,110 +2,175 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  CreditCard,
+  ReceiptText,
+  TrendingUp,
+  Wallet,
+} from "lucide-react"
+import { formatPKR, formatPKRCompact } from "@/lib/format"
+import type { FeesSummary } from "@/lib/hooks/use-fees"
+import { cn } from "@/lib/utils"
 
-const monthlyData = [
-  { month: "Jul", collected: 180000, target: 200000 },
-  { month: "Aug", collected: 195000, target: 200000 },
-  { month: "Sep", collected: 210000, target: 200000 },
-  { month: "Oct", collected: 188000, target: 200000 },
-  { month: "Nov", collected: 220000, target: 200000 },
-  { month: "Dec", collected: 165000, target: 200000 },
-]
+interface FeeCollectionStatsProps {
+  summary: FeesSummary | undefined
+  isLoading: boolean
+  /** Hide the invoice breakdown (student/parent views only need the rate). */
+  compact?: boolean
+}
 
-export function FeeCollectionStats() {
-  const totalCollected = 1158000
-  const totalTarget = 1400000
-  const collectionRate = Math.round((totalCollected / totalTarget) * 100)
+export function FeeCollectionStats({ summary, isLoading, compact = false }: FeeCollectionStatsProps) {
+  if (isLoading || !summary) {
+    return (
+      <div className={cn("grid gap-4", compact ? "md:grid-cols-3" : "md:grid-cols-2 lg:grid-cols-4")}>
+        {Array.from({ length: compact ? 3 : 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full rounded-xl" />
+        ))}
+      </div>
+    )
+  }
+
+  const cards = [
+    {
+      title: "Total billed",
+      value: formatPKR(summary.billed),
+      hint: `${summary.invoices.total} invoice${summary.invoices.total === 1 ? "" : "s"}`,
+      icon: ReceiptText,
+      tone: "from-blue-500 to-blue-600",
+      bg: "from-blue-50 to-blue-100",
+    },
+    {
+      title: "Collected",
+      value: formatPKR(summary.paid),
+      hint: `${formatPKRCompact(summary.collectedThisMonth)} this month`,
+      icon: Wallet,
+      tone: "from-emerald-500 to-emerald-600",
+      bg: "from-emerald-50 to-emerald-100",
+    },
+    {
+      title: "Outstanding",
+      value: formatPKR(summary.outstanding),
+      hint:
+        summary.invoices.overdue > 0
+          ? `${summary.invoices.overdue} overdue invoice${summary.invoices.overdue === 1 ? "" : "s"}`
+          : "Nothing overdue",
+      icon: AlertCircle,
+      tone: "from-red-500 to-red-600",
+      bg: "from-red-50 to-red-100",
+    },
+    {
+      title: "Collection rate",
+      value: summary.collectionRate !== null ? `${summary.collectionRate}%` : "—",
+      hint:
+        summary.collectionRate !== null && summary.collectionRate >= 90
+          ? "Healthy"
+          : "Follow up on dues",
+      icon: TrendingUp,
+      tone: "from-violet-500 to-purple-600",
+      bg: "from-violet-50 to-violet-100",
+    },
+  ]
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      {/* Collection Progress */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Collection Progress</CardTitle>
-          <p className="text-xs text-muted-foreground">Academic Year 2025-2026</p>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between">
-              <span className="text-3xl font-bold">${(totalCollected / 1000).toFixed(0)}K</span>
-              <span className="text-sm text-muted-foreground">of ${(totalTarget / 1000).toFixed(0)}K target</span>
-            </div>
-            <Progress value={collectionRate} className="h-3" />
-            <p className="text-sm text-muted-foreground">{collectionRate}% collected</p>
-          </div>
+    <div className="space-y-4">
+      <div className={cn("grid gap-4", compact ? "md:grid-cols-3" : "md:grid-cols-2 lg:grid-cols-4")}>
+        {(compact ? cards.slice(1) : cards).map((c) => (
+          <Card key={c.title} className={cn("border-0 bg-gradient-to-br shadow-md", c.bg)}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-gray-600">
+                    {c.title}
+                  </p>
+                  <p className="mt-1.5 text-2xl font-bold text-gray-900">{c.value}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{c.hint}</p>
+                </div>
+                <div
+                  className={cn(
+                    "flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow",
+                    c.tone,
+                  )}
+                >
+                  <c.icon className="h-5 w-5" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-          <div className="grid grid-cols-3 gap-4 pt-4 border-t">
-            <div>
-              <p className="text-2xl font-bold text-success">$1.16M</p>
-              <p className="text-xs text-muted-foreground">Collected</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-warning">$180K</p>
-              <p className="text-xs text-muted-foreground">Pending</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-destructive">$62K</p>
-              <p className="text-xs text-muted-foreground">Overdue</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {!compact && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Collection progress</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              {formatPKR(summary.paid)} of {formatPKR(summary.billed)} billed
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Progress value={summary.collectionRate ?? 0} className="h-3" />
 
-      {/* Monthly Trend */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Monthly Collection Trend</CardTitle>
-          <p className="text-xs text-muted-foreground">Collected vs Target</p>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.01 270)" vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "oklch(0.50 0.02 270)", fontSize: 11 }}
-                />
-                <YAxis
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: "oklch(0.50 0.02 270)", fontSize: 11 }}
-                  tickFormatter={(value) => `$${value / 1000}k`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "oklch(1 0 0)",
-                    border: "1px solid oklch(0.92 0.01 270)",
-                    borderRadius: "12px",
-                  }}
-                  formatter={(value) => [`$${(Number(value) / 1000).toFixed(0)}K`, ""]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="collected"
-                  stroke="oklch(0.55 0.25 265)"
-                  strokeWidth={3}
-                  dot={{ fill: "oklch(0.55 0.25 265)", strokeWidth: 0, r: 4 }}
-                  name="Collected"
-                />
-                <Line
-                  type="monotone"
-                  dataKey="target"
-                  stroke="oklch(0.75 0.02 270)"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  dot={false}
-                  name="Target"
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+              <StatusTile
+                label="Paid"
+                value={summary.invoices.paid}
+                icon={CheckCircle2}
+                tone="text-emerald-600"
+              />
+              <StatusTile
+                label="Partial"
+                value={summary.invoices.partial}
+                icon={CreditCard}
+                tone="text-blue-600"
+              />
+              <StatusTile
+                label="Pending"
+                value={summary.invoices.pending}
+                icon={Clock}
+                tone="text-amber-600"
+              />
+              <StatusTile
+                label="Overdue"
+                value={summary.invoices.overdue}
+                icon={AlertCircle}
+                tone="text-red-600"
+              />
+              <StatusTile
+                label="Waived"
+                value={summary.invoices.waived}
+                icon={ReceiptText}
+                tone="text-violet-600"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function StatusTile({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string
+  value: number
+  icon: React.ElementType
+  tone: string
+}) {
+  return (
+    <div className="rounded-lg border border-border p-2.5">
+      <div className="flex items-center gap-1.5">
+        <Icon className={cn("h-3.5 w-3.5", tone)} />
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+      <p className="mt-0.5 text-lg font-bold">{value}</p>
     </div>
   )
 }

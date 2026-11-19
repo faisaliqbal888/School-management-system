@@ -23,7 +23,6 @@ let classId = ''
 let sectionId = ''
 let otherSectionId = ''
 let teacherUserId = ''
-let studentUserId = ''
 let studentIds: string[] = []
 const createdUserIds: string[] = []
 
@@ -136,7 +135,6 @@ beforeAll(async () => {
     })
 
     ids.push(student.id)
-    if (i === 0) studentUserId = user.id
   }
   studentIds = ids
 
@@ -303,8 +301,7 @@ describe('attendance: history & summary', () => {
       .set('Authorization', `Bearer ${teacherToken}`)
 
     expect(res.status).toBe(200)
-    const sectionIds = new Set(res.body.data.map((r: { sectionId?: string }) => r.id))
-    expect(sectionIds.size).toBeGreaterThan(0)
+    expect(res.body.data.length).toBeGreaterThan(0)
     // none of the rows may belong to section B
     expect(
       res.body.data.every((r: { admissionNo: string }) => r.admissionNo !== `TST-STU-${suffix}-3`),
