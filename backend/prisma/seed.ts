@@ -163,10 +163,12 @@ async function main() {
 
   for (let i = 0; i < TEACHER_COUNT; i++) {
     const male = i % 2 === 0
-    const first = male ? rand(FIRST_MALE) : rand(FIRST_FEMALE)
-    const name = `${first} ${rand(LAST_NAMES)}`
-    const department = TEACHER_DEPARTMENTS[i % TEACHER_DEPARTMENTS.length]!
-    const email = `${first.toLowerCase()}.${i + 1}@ravischool.edu.pk`
+    // Teacher #1 is a fixed demo account — the login page links straight to it.
+    const isDemoTeacher = i === 0
+    const first = isDemoTeacher ? 'Ahmed' : male ? rand(FIRST_MALE) : rand(FIRST_FEMALE)
+    const name = isDemoTeacher ? 'Ahmed Khan' : `${first} ${rand(LAST_NAMES)}`
+    const department = isDemoTeacher ? 'Mathematics' : TEACHER_DEPARTMENTS[i % TEACHER_DEPARTMENTS.length]!
+    const email = isDemoTeacher ? 'ahmed.1@ravischool.edu.pk' : `${first.toLowerCase()}.${i + 1}@ravischool.edu.pk`
 
     const user = await prisma.user.create({
       data: {
@@ -175,7 +177,11 @@ async function main() {
         role: Role.TEACHER,
         name,
         phone: phone(),
-        avatarUrl: male ? '/male-teacher-portrait.png' : '/female-teacher-portrait.png',
+        avatarUrl: isDemoTeacher
+          ? '/male-teacher-portrait.png'
+          : male
+            ? '/male-teacher-portrait.png'
+            : '/female-teacher-portrait.png',
       },
     })
 
@@ -197,12 +203,17 @@ async function main() {
     teachers.push({ id: teacher.id, userId: user.id, name, department, baseSalary: 85000 + i * 6500 })
   }
 
-  // assign subjects to teachers (by department)
+  // Assign subjects to teachers.
+  // Each teacher is linked to *one* subject per class level (e.g. Mathematics
+  // for Grade 6, 7, 8 …) so a teacher's subject list never repeats a name.
+  const allSubjects = Object.values(subjectsByClass).flat() as { id: string; name: string }[]
   for (const teacher of teachers) {
-    const matching = Object.values(subjectsByClass).flat().filter(
-      (s) => s.name === teacher.department || (teacher.department === 'Science' && s.name === 'Science'),
-    )
-    for (const subject of pickSome(matching.length ? matching : Object.values(subjectsByClass).flat(), 6)) {
+    const matching = allSubjects.filter((s) => s.name === teacher.department)
+    const pool = matching.length ? matching : allSubjects
+    const seenNames = new Set<string>()
+    for (const subject of pool) {
+      if (seenNames.has(subject.name)) continue
+      seenNames.add(subject.name)
       await prisma.teacherSubject
         .create({ data: { teacherId: teacher.id, subjectId: subject.id } })
         .catch(() => undefined)
