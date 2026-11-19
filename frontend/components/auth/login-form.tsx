@@ -1,5 +1,7 @@
 "use client"
 
+import { SCHOOL } from "@/lib/school"
+
 import type React from "react"
 
 import { useState } from "react"
@@ -79,8 +81,8 @@ export function LoginForm() {
               <School className="h-7 w-7" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">EduFlow</h1>
-              <p className="text-white/70 text-sm">School Management System</p>
+              <h1 className="text-3xl font-bold tracking-tight">{SCHOOL.name}</h1>
+              <p className="text-white/70 text-sm">{SCHOOL.tagline}</p>
             </div>
           </div>
 
@@ -121,8 +123,8 @@ export function LoginForm() {
               <School className="h-6 w-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">EduFlow</h1>
-              <p className="text-muted-foreground text-xs">School Management System</p>
+              <h1 className="text-2xl font-bold tracking-tight">{SCHOOL.name}</h1>
+              <p className="text-muted-foreground text-xs">{SCHOOL.tagline}</p>
             </div>
           </div>
 

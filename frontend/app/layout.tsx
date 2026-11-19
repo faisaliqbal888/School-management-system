@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/auth-context"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "EduFlow - School Management System",
+  title: "Ravi International School — School Management",
   description: "A modern, joyful school management platform for administrators, teachers, and parents",
 }
 

@@ -1,5 +1,7 @@
 "use client"
 
+import { SCHOOL } from "@/lib/school"
+
 import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -49,7 +51,7 @@ export function ParentSidebar() {
         </div>
         {!collapsed && (
           <div className="flex flex-col">
-            <span className="font-bold text-lg tracking-tight">EduFlow</span>
+            <span className="font-bold text-lg tracking-tight">{SCHOOL.shortName}</span>
             <span className="text-xs text-white/70">Parent Portal</span>
           </div>
         )}

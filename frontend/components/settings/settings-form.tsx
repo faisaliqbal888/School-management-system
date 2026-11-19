@@ -61,7 +61,7 @@ export function SettingsForm() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>School Name</Label>
-                <Input defaultValue="EduFlow International School" />
+                <Input defaultValue="Ravi International School" />
               </div>
               <div className="space-y-2">
                 <Label>School Code</Label>
