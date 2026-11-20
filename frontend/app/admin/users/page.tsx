@@ -1,404 +1,412 @@
 "use client"
 
-import { useAuth, useRequireRole } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Loader2,
-  UserPlus,
-  Search,
-  Copy,
-  CheckCircle2,
-  Users,
-  GraduationCap,
-  MoreVertical,
-  Edit,
-  Trash2,
-  Key,
-} from "lucide-react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { CheckCircle2, Copy, Key, Loader2, MoreVertical, Search, UserPlus, Users } from "lucide-react"
+import { useRequireRole } from "@/lib/auth-context"
+import { useUserMutations, useUsers } from "@/lib/hooks/use-admin"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
-const existingUsers = [
-  {
-    id: "1",
-    name: "Alex Thompson",
-    email: "student@gmail.com",
-    role: "student",
-    class: "10-A",
-    status: "active",
-    createdAt: "Nov 15, 2024",
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    email: "teacher@gmail.com",
-    role: "teacher",
-    department: "Mathematics",
-    status: "active",
-    createdAt: "Sep 1, 2024",
-  },
-  {
-    id: "3",
-    name: "Emma Wilson",
-    email: "emma.w@school.edu",
-    role: "student",
-    class: "10-A",
-    status: "active",
-    createdAt: "Nov 10, 2024",
-  },
-  {
-    id: "4",
-    name: "John Smith",
-    email: "john.s@school.edu",
-    role: "teacher",
-    department: "Physics",
-    status: "active",
-    createdAt: "Aug 15, 2024",
-  },
-  {
-    id: "5",
-    name: "Michael Lee",
-    email: "michael.l@school.edu",
-    role: "student",
-    class: "9-B",
-    status: "inactive",
-    createdAt: "Oct 20, 2024",
-  },
-]
+const roles = ["STUDENT", "TEACHER", "PARENT", "ADMIN"] as const
+const roleTone: Record<string, string> = {
+  ADMIN: "bg-primary/10 text-primary",
+  TEACHER: "bg-violet-100 text-violet-700",
+  STUDENT: "bg-emerald-100 text-emerald-700",
+  PARENT: "bg-amber-100 text-amber-700",
+}
+
+const initialsOf = (name: string) =>
+  name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("")
 
 export default function AdminUsersPage() {
-  const { user, isLoading, isAuthenticated } = useAuth()
-  const [searchQuery, setSearchQuery] = useState("")
-  const [roleFilter, setRoleFilter] = useState("all")
-  const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    role: "student",
-    class: "",
-    department: "",
-  })
-  const [generatedCredentials, setGeneratedCredentials] = useState<{ email: string; password: string } | null>(null)
-  const [copied, setCopied] = useState(false)
-
   const { ready } = useRequireRole("ADMIN")
+  const [search, setSearch] = useState("")
+  const [role, setRole] = useState("")
+  const [page, setPage] = useState(1)
 
-  const handleCreateUser = () => {
-    const tempPassword = `Temp${Math.random().toString(36).slice(-8)}!`
-    setGeneratedCredentials({
-      email: newUser.email,
-      password: tempPassword,
-    })
+  const [createOpen, setCreateOpen] = useState(false)
+  const [form, setForm] = useState({ name: "", email: "", role: "STUDENT", password: "" })
+  const [issued, setIssued] = useState<{ name: string; password: string } | null>(null)
+
+  const { users, meta, stats, isLoading, error, refetch } = useUsers({
+    page,
+    limit: 10,
+    search: search || undefined,
+    role: role || undefined,
+  })
+  const { pending, createUser, setStatus, resetPassword } = useUserMutations()
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
-  const copyCredentials = () => {
-    if (generatedCredentials) {
-      navigator.clipboard.writeText(`Email: ${generatedCredentials.email}\nPassword: ${generatedCredentials.password}`)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+  const copy = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success("Copied to clipboard")
+    } catch {
+      toast.error("Clipboard is not available")
     }
   }
 
-  const filteredUsers = existingUsers.filter((u) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesRole = roleFilter === "all" || u.role === roleFilter
-    return matchesSearch && matchesRole
-  })
+  const submitCreate = async (event: React.FormEvent) => {
+    event.preventDefault()
+    try {
+      await createUser({
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role,
+      })
+      toast.success(`${form.name} added to the directory`)
+      setCreateOpen(false)
+      setForm({ name: "", email: "", role: "STUDENT", password: "" })
+      refetch()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not create the user")
+    }
+  }
 
-  if (!ready) return <FullPageLoader />
+  const stats_ = [
+    { label: "Total users", value: stats?.total ?? 0, hint: "all roles" },
+    { label: "Active", value: stats?.active ?? 0, hint: "can sign in" },
+    { label: "Suspended", value: stats?.inactive ?? 0, hint: "access blocked" },
+    {
+      label: "Students",
+      value: stats?.byRole.STUDENT ?? 0,
+      hint: `${stats?.byRole.TEACHER ?? 0} teachers · ${stats?.byRole.PARENT ?? 0} parents`,
+    },
+  ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-violet-50/20">
+    <div className="min-h-screen bg-background">
       <AdminSidebar />
-      <div className="lg:pl-64 transition-all duration-300">
+      <div className="transition-all duration-300 lg:pl-64">
         <AdminHeader />
-        <main className="p-6 space-y-6">
-          {/* Header Section */}
-          <div className="bg-gradient-to-r from-violet-500 to-indigo-600 text-white p-6 rounded-xl shadow-lg flex items-center justify-between">
+        <main className="space-y-6 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-3xl font-bold">👤 User & Credential Management</h1>
-              <p className="text-violet-100 mt-1">Create and manage user credentials for students and teachers</p>
+              <h1 className="text-2xl font-bold">Users</h1>
+              <p className="text-muted-foreground">Accounts, roles and credentials for the whole school</p>
             </div>
-            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-violet-500 to-purple-600">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Create User
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create New User</DialogTitle>
-                  <DialogDescription>
-                    Create credentials for a new student or teacher. A temporary password will be generated.
-                  </DialogDescription>
-                </DialogHeader>
+            <Button onClick={() => setCreateOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              New user
+            </Button>
+          </div>
 
-                {!generatedCredentials ? (
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Full Name</Label>
-                      <Input
-                        placeholder="Enter full name"
-                        value={newUser.name}
-                        onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Email</Label>
-                      <Input
-                        type="email"
-                        placeholder="Enter email address"
-                        value={newUser.email}
-                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Role</Label>
-                      <Select value={newUser.role} onValueChange={(v) => setNewUser({ ...newUser, role: v })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="teacher">Teacher</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {newUser.role === "student" && (
-                      <div className="space-y-2">
-                        <Label>Class</Label>
-                        <Select value={newUser.class} onValueChange={(v) => setNewUser({ ...newUser, class: v })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select class" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="9-A">Class 9-A</SelectItem>
-                            <SelectItem value="9-B">Class 9-B</SelectItem>
-                            <SelectItem value="10-A">Class 10-A</SelectItem>
-                            <SelectItem value="10-B">Class 10-B</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {newUser.role === "teacher" && (
-                      <div className="space-y-2">
-                        <Label>Department</Label>
-                        <Select
-                          value={newUser.department}
-                          onValueChange={(v) => setNewUser({ ...newUser, department: v })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Mathematics">Mathematics</SelectItem>
-                            <SelectItem value="Physics">Physics</SelectItem>
-                            <SelectItem value="Chemistry">Chemistry</SelectItem>
-                            <SelectItem value="English">English</SelectItem>
-                            <SelectItem value="Computer Science">Computer Science</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    <Button className="w-full" onClick={handleCreateUser}>
-                      Generate Credentials
-                    </Button>
-                  </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats_.map((stat) => (
+              <Card key={stat.label}>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{stat.hint}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative w-full max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value)
+                  setPage(1)
+                }}
+                placeholder="Search name or email…"
+                className="pl-8"
+                aria-label="Search users"
+              />
+            </div>
+            <div className="flex gap-1">
+              <Button
+                variant={role === "" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setRole("")
+                  setPage(1)
+                }}
+              >
+                All
+              </Button>
+              {roles.map((entry) => (
+                <Button
+                  key={entry}
+                  variant={role === entry ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => {
+                    setRole(entry)
+                    setPage(1)
+                  }}
+                >
+                  {entry.charAt(0) + entry.slice(1).toLowerCase()}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {error ? (
+            <Card>
+              <CardContent className="p-10 text-center text-sm text-muted-foreground">{error}</CardContent>
+            </Card>
+          ) : isLoading ? (
+            <Skeleton className="h-72 w-full" />
+          ) : (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Users className="h-4 w-4" /> Directory
+                  {meta && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {meta.total} account{meta.total === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {users.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No users match this filter.</p>
                 ) : (
-                  <div className="space-y-4 py-4">
-                    <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800">
-                      <div className="flex items-center gap-2 mb-3">
-                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                        <span className="font-semibold text-emerald-700 dark:text-emerald-400">
-                          User Created Successfully
-                        </span>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Email:</span>
-                          <span className="font-mono">{generatedCredentials.email}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Temporary Password:</span>
-                          <span className="font-mono">{generatedCredentials.password}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      The user will be required to change their password on first login.
-                    </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <th className="py-2">User</th>
+                          <th className="py-2">Role</th>
+                          <th className="py-2">Reference</th>
+                          <th className="py-2">Status</th>
+                          <th className="py-2">Last sign-in</th>
+                          <th className="py-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.map((user) => (
+                          <tr key={user.id} className="border-b last:border-0">
+                            <td className="py-2">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-9 w-9">
+                                  <AvatarFallback className="bg-primary text-xs font-semibold text-primary-foreground">
+                                    {initialsOf(user.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="truncate font-medium">{user.name}</p>
+                                  <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-2">
+                              <Badge className={cn("capitalize", roleTone[user.role])}>
+                                {user.role.toLowerCase()}
+                              </Badge>
+                            </td>
+                            <td className="py-2 text-xs text-muted-foreground">
+                              {user.admissionNo ?? user.employeeNo ?? "—"}
+                              {user.className ? ` · ${user.className}` : ""}
+                              {user.department ? ` · ${user.department}` : ""}
+                            </td>
+                            <td className="py-2">
+                              <Badge variant={user.status === "ACTIVE" ? "secondary" : "outline"}>
+                                {user.status.toLowerCase()}
+                              </Badge>
+                            </td>
+                            <td className="py-2 text-xs text-muted-foreground">
+                              {user.lastLoginAt
+                                ? new Date(user.lastLoginAt).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                  })
+                                : "never"}
+                            </td>
+                            <td className="py-2 text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" aria-label={`Actions for ${user.name}`}>
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    disabled={pending}
+                                    onClick={async () => {
+                                      try {
+                                        const result = await resetPassword(user.id)
+                                        setIssued(result)
+                                      } catch (err) {
+                                        toast.error(err instanceof Error ? err.message : "Reset failed")
+                                      }
+                                    }}
+                                  >
+                                    <Key className="mr-2 h-4 w-4" /> Reset password
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    disabled={pending}
+                                    onClick={async () => {
+                                      const next = user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE"
+                                      try {
+                                        await setStatus(user.id, next)
+                                        toast.success(`${user.name} is now ${next.toLowerCase()}`)
+                                        refetch()
+                                      } catch (err) {
+                                        toast.error(err instanceof Error ? err.message : "Update failed")
+                                      }
+                                    }}
+                                  >
+                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                    {user.status === "ACTIVE" ? "Suspend account" : "Reactivate account"}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {meta && meta.totalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      Page {meta.page} of {meta.totalPages}
+                    </span>
                     <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1 bg-transparent" onClick={copyCredentials}>
-                        {copied ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-                        {copied ? "Copied!" : "Copy Credentials"}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={meta.page <= 1}
+                        onClick={() => setPage((value) => Math.max(1, value - 1))}
+                      >
+                        Previous
                       </Button>
                       <Button
-                        className="flex-1"
-                        onClick={() => {
-                          setGeneratedCredentials(null)
-                          setNewUser({ name: "", email: "", role: "student", class: "", department: "" })
-                          setCreateDialogOpen(false)
-                        }}
+                        variant="outline"
+                        size="sm"
+                        disabled={meta.page >= meta.totalPages}
+                        onClick={() => setPage((value) => value + 1)}
                       >
-                        Done
+                        Next
                       </Button>
                     </div>
                   </div>
                 )}
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
-                  <p className="text-2xl font-bold">{existingUsers.length}</p>
-                </div>
-                <Users className="h-8 w-8 text-violet-500" />
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Students</p>
-                  <p className="text-2xl font-bold">{existingUsers.filter((u) => u.role === "student").length}</p>
-                </div>
-                <GraduationCap className="h-8 w-8 text-blue-500" />
-              </CardContent>
-            </Card>
-            <Card className="border-0 shadow-md">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Teachers</p>
-                  <p className="text-2xl font-bold">{existingUsers.filter((u) => u.role === "teacher").length}</p>
-                </div>
-                <Users className="h-8 w-8 text-emerald-500" />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* User List */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                <CardTitle>All Users</CardTitle>
-                <div className="flex gap-3">
-                  <div className="relative flex-1 min-w-[200px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search users..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Select value={roleFilter} onValueChange={setRoleFilter}>
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Roles</SelectItem>
-                      <SelectItem value="student">Students</SelectItem>
-                      <SelectItem value="teacher">Teachers</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {filteredUsers.map((u) => (
-                  <div
-                    key={u.id}
-                    className="flex items-center justify-between p-4 rounded-xl border border-border/50 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarImage src="/placeholder.svg" />
-                        <AvatarFallback
-                          className={
-                            u.role === "student" ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"
-                          }
-                        >
-                          {u.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold">{u.name}</p>
-                        <p className="text-sm text-muted-foreground">{u.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right hidden sm:block">
-                        <Badge variant={u.role === "student" ? "secondary" : "default"} className="mb-1">
-                          {u.role}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          {u.role === "student" ? `Class ${u.class}` : u.department}
-                        </p>
-                      </div>
-                      <Badge variant={u.status === "active" ? "outline" : "secondary"}>{u.status}</Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
-                            <Edit className="h-4 w-4 mr-2" /> Edit User
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Key className="h-4 w-4 mr-2" /> Reset Password
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete User
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          )}
         </main>
       </div>
-    </div>
-  )
-}
 
-/** Shared loading fallback while the session is being verified. */
-function FullPageLoader() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      {/* New user */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add a user</DialogTitle>
+            <DialogDescription>
+              Creates a sign-in account. Link the student or teacher profile from its own page afterwards.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submitCreate} className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="new-name">Full name</Label>
+              <Input
+                id="new-name"
+                required
+                value={form.name}
+                onChange={(event) => setForm({ ...form, name: event.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="new-email">Email</Label>
+              <Input
+                id="new-email"
+                type="email"
+                required
+                value={form.email}
+                onChange={(event) => setForm({ ...form, email: event.target.value })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="new-role">Role</Label>
+              <select
+                id="new-role"
+                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
+                value={form.role}
+                onChange={(event) => setForm({ ...form, role: event.target.value })}
+              >
+                {roles.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {entry.charAt(0) + entry.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="new-password">Temporary password</Label>
+              <Input
+                id="new-password"
+                required
+                minLength={8}
+                value={form.password}
+                onChange={(event) => setForm({ ...form, password: event.target.value })}
+                placeholder="At least 8 characters"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? "Creating…" : "Create account"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Issued password */}
+      <Dialog open={issued !== null} onOpenChange={(open) => !open && setIssued(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New password for {issued?.name}</DialogTitle>
+            <DialogDescription>Shown once. Share it over a secure channel and ask them to change it.</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-3">
+            <code className="flex-1 break-all text-sm">{issued?.password}</code>
+            <Button variant="outline" size="sm" onClick={() => issued && copy(issued.password)}>
+              <Copy className="mr-2 h-4 w-4" /> Copy
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

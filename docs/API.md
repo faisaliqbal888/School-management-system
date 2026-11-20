@@ -319,6 +319,25 @@ catalogue stays consistent without a separate stock table.
 
 ---
 
+## Administration — users, settings and alerts
+
+`ADMIN` only; every other role receives `403`.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/admin/users` | Directory — `page`, `limit`, `role`, `status`, `search`; payload adds `stats` |
+| POST | `/admin/users` | `{ name, email, password, role, phone? }` — 400 on a duplicate email |
+| PATCH | `/admin/users/:id/status` | `{ status: ACTIVE \| INACTIVE \| SUSPENDED }` — self-change is refused |
+| POST | `/admin/users/:id/reset-password` | Issues a one-time password, revokes refresh tokens |
+| GET | `/admin/settings` | Ten known keys, each with `source: database \| default` |
+| PATCH | `/admin/settings` | `{ updates: [{ key, value }] }` — unknown keys reject the whole batch |
+| GET | `/admin/alerts` | Alerts derived on read from fees, attendance, library, inventory, HR |
+
+Suspending an account blocks sign-in immediately. Alerts are **not stored** — each one is a live
+query, so fixing the underlying record clears the alert on the next refresh.
+
+---
+
 ## Query parameters (list endpoints)
 
 | Param | Type | Default | Notes |

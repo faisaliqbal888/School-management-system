@@ -6,7 +6,7 @@ role-based portal.
 
 > **Status:** Phases 0–6 complete — backend + UI live for auth, academics, students, teachers,
 > attendance, fees, exams/results, timetable, notifications, dashboards, reports with CSV export,
-> library, transport, hostel, inventory and HR/payroll · 130 backend tests green · responsive
+> library, transport, hostel, inventory and HR/payroll, plus the user directory, school settings and a live alerts feed · 145 backend tests green · responsive
 > layout with a mobile navigation drawer on every role · frontend builds clean.
 > See [`docs/PLAN.md`](docs/PLAN.md) for the full review and roadmap.
 
@@ -133,7 +133,7 @@ CI runs typecheck + build for the frontend and typecheck + tests for the backend
 | 3 | Students, teachers, attendance, fees — full CRUD + frontend wiring | ✅ |
 | 4 | Exams, timetable, notifications — full backend + UI | ✅ |
 | 5 | Live dashboards, reports, CSV exports | ✅ |
-| 6 | Mobile drawer, loading states, operations pages (library/transport/hostel/inventory/HR) | ✅ |
+| 6 | Mobile drawer, loading states, operations pages (library/transport/hostel/inventory/HR), users, settings, alerts | ✅ |
 | 7 | Tests, security pass, deployment | 🔜 |
 
 Full detail: [`docs/PLAN.md`](docs/PLAN.md)
