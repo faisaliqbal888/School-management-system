@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Download,
+  FileDown,
   Loader2,
   Calendar,
   FileText,
@@ -20,6 +21,7 @@ import {
 import { useRequireRole } from "@/lib/auth-context"
 import {
   downloadReportCsv,
+  downloadReportPdf,
   feeTotals,
   useAttendanceReport,
   useEnrolmentReport,
@@ -74,11 +76,12 @@ export default function AdminReportsPage() {
     { students: 0, capacity: 0, sections: 0 },
   )
 
-  const handleExport = async (type: ReportType) => {
+  const handleExport = async (type: ReportType, format: "csv" | "pdf" = "csv") => {
     setExporting(type)
     try {
-      const filename = await downloadReportCsv(type, days)
-      toast.success("Report downloaded", { description: filename })
+      const filename =
+        format === "pdf" ? await downloadReportPdf(type, days) : await downloadReportCsv(type, days)
+      toast.success(`${format.toUpperCase()} downloaded`, { description: filename })
     } catch {
       toast.error("Could not download this report")
     } finally {
@@ -185,19 +188,34 @@ export default function AdminReportsPage() {
                     <CardTitle className="text-base">Fee collection by class</CardTitle>
                     <p className="text-sm text-muted-foreground">Billed vs collected per grade</p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleExport("fees")}
-                    disabled={exporting === "fees"}
-                  >
-                    {exporting === "fees" ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-1.5 h-4 w-4" />
-                    )}
-                    CSV
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("fees", "csv")}
+                      disabled={exporting === "fees"}
+                    >
+                      {exporting === "fees" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-1.5 h-4 w-4" />
+                      )}
+                      CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("fees", "pdf")}
+                      disabled={exporting === "fees"}
+                    >
+                      {exporting === "fees" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="mr-1.5 h-4 w-4" />
+                      )}
+                      PDF
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {fees.isLoading ? (
@@ -255,19 +273,34 @@ export default function AdminReportsPage() {
                     <CardTitle className="text-base">Attendance by section</CardTitle>
                     <p className="text-sm text-muted-foreground">Last {days} days · present + late count as attended</p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleExport("attendance")}
-                    disabled={exporting === "attendance"}
-                  >
-                    {exporting === "attendance" ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-1.5 h-4 w-4" />
-                    )}
-                    CSV
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("attendance", "csv")}
+                      disabled={exporting === "attendance"}
+                    >
+                      {exporting === "attendance" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-1.5 h-4 w-4" />
+                      )}
+                      CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("attendance", "pdf")}
+                      disabled={exporting === "attendance"}
+                    >
+                      {exporting === "attendance" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="mr-1.5 h-4 w-4" />
+                      )}
+                      PDF
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {attendance.isLoading ? (
@@ -312,19 +345,34 @@ export default function AdminReportsPage() {
                     <CardTitle className="text-base">Exam performance</CardTitle>
                     <p className="text-sm text-muted-foreground">Latest completed and published exams</p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleExport("performance")}
-                    disabled={exporting === "performance"}
-                  >
-                    {exporting === "performance" ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-1.5 h-4 w-4" />
-                    )}
-                    CSV
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("performance", "csv")}
+                      disabled={exporting === "performance"}
+                    >
+                      {exporting === "performance" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-1.5 h-4 w-4" />
+                      )}
+                      CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("performance", "pdf")}
+                      disabled={exporting === "performance"}
+                    >
+                      {exporting === "performance" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="mr-1.5 h-4 w-4" />
+                      )}
+                      PDF
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {performance.isLoading ? (
@@ -379,19 +427,34 @@ export default function AdminReportsPage() {
                     <CardTitle className="text-base">Enrolment &amp; capacity</CardTitle>
                     <p className="text-sm text-muted-foreground">Seats used per class, with gender split</p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleExport("enrolment")}
-                    disabled={exporting === "enrolment"}
-                  >
-                    {exporting === "enrolment" ? (
-                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-1.5 h-4 w-4" />
-                    )}
-                    CSV
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("enrolment", "csv")}
+                      disabled={exporting === "enrolment"}
+                    >
+                      {exporting === "enrolment" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-1.5 h-4 w-4" />
+                      )}
+                      CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleExport("enrolment", "pdf")}
+                      disabled={exporting === "enrolment"}
+                    >
+                      {exporting === "enrolment" ? (
+                        <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileDown className="mr-1.5 h-4 w-4" />
+                      )}
+                      PDF
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {enrolment.isLoading ? (

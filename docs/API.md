@@ -290,8 +290,13 @@ A learner with no linked student record gets an empty but well-formed payload (`
 | GET | `/reports/enrolment` | Per class: sections, capacity, students, utilisation, gender and status split |
 | GET | `/reports/export?type=fees\|attendance\|performance\|enrolment&days=30` | CSV download (`text/csv`, `Content-Disposition: attachment`) |
 
-Every figure is computed on read — no materialised tables — and the CSV is generated from exactly
-the same rows the UI renders. Teachers and learners receive `403`.
+Every figure is computed on read — no materialised tables — and both the CSV and the PDF are
+generated from exactly the same rows the UI renders, so the two downloads can never disagree.
+
+`GET /reports/export?type=fees|attendance|performance|enrolment[&days=30]` → `text/csv`
+`GET /reports/export.pdf?…` → `application/pdf`, A4 landscape with the school masthead, zebra
+striped rows, repeated header on page breaks and a generated-at footer (PDFKit; no browser).
+Teachers and learners receive `403`.
 
 ---
 
@@ -402,6 +407,6 @@ Every route below is served under `/api/v1` and shares the envelope
 | Timetable | `GET/POST /timetable`, `DELETE /timetable/:id`, `GET /timetable/me`, `GET /timetable/options` |
 | Notifications | `GET/POST /notifications`, `GET /notifications/unread-count`, `/options`, `/stats`, `POST /notifications/read-all`, `PATCH /notifications/:id` |
 | Dashboards | `GET /dashboard/summary` (role-aware) |
-| Reports | `GET /reports/fees`, `/attendance`, `/performance`, `/enrolment`, `/export` |
+| Reports | `GET /reports/fees`, `/attendance`, `/performance`, `/enrolment`, `/export` (CSV), `/export.pdf` (PDF) |
 | Operations | `GET /library/overview`, `/library/books`, `/library/issues`, `POST /library/issues`, `PATCH /library/issues/:id/return`, `POST /library/refresh-overdue`, `GET /transport/overview`, `/transport/routes/:id/riders`, `GET /hostel/overview`, `GET /inventory/overview`, `GET /hr/payroll`, `/hr/leaves` |
 | Administration | `GET/POST /admin/users`, `PATCH /admin/users/:id/status`, `POST /admin/users/:id/reset-password`, `GET /admin/staff`, `GET/PATCH /admin/settings`, `GET /admin/alerts` |

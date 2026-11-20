@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "School Management System \u2014 REST API (Express + TypeScript + Prisma)",
+  "description": "School Management System — REST API (Express + TypeScript + Prisma)",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -40,6 +40,7 @@
     "helmet": "8.1.0",
     "jsonwebtoken": "9.0.2",
     "morgan": "1.10.1",
+    "pdfkit": "^0.15.0",
     "pg": "8.16.3",
     "zod": "3.25.76"
   },
@@ -53,6 +54,7 @@
     "@types/jsonwebtoken": "9.0.10",
     "@types/morgan": "1.9.10",
     "@types/node": "22.10.5",
+    "@types/pdfkit": "^0.17.7",
     "@types/supertest": "6.0.3",
     "prisma": "6.19.3",
     "supertest": "7.1.4",

@@ -115,30 +115,32 @@ Exams/Results · Timetable · Notifications · Library · Transport · Hostel ·
 
 ### Phase 5 — Dashboards & Reports ✅ COMPLETE
 Real aggregated stats, charts from DB, CSV/PDF export, admin report builder
-- **Gap:** export is **CSV only** — PDF was in the plan and is not implemented
+- [x] PDF export alongside CSV (`/reports/export.pdf`) — A4 landscape, school masthead, page-break
+      headers, generated-at footer; both formats share one data path
 
-### Phase 6 — Frontend cleanup ◐ MOSTLY COMPLETE
+### Phase 6 — Frontend cleanup ✅ COMPLETE
 - [x] Mobile drawer navigation (shared `mobile-nav.tsx` on all four roles)
 - [x] Remove dead demo arrays, mock API routes and orphan components
 - [x] Loading / empty states on the rebuilt pages
-- [ ] **Route-level `error.tsx` / `not-found.tsx`** — none exist, an API failure shows a
-      blank boundary instead of a recoverable screen
-- [ ] **Image optimisation** — `public/` is 31 MB across 69 files and only 3 are referenced;
-      `images.unoptimized: true` is still set
-- [ ] **Form validation with RHF + zod** — `react-hook-form` and `zod` are installed but no
-      form uses them; every form validates ad hoc (`if (!form.name) …`)
+- [x] **Route-level `error.tsx` / `not-found.tsx` / `loading.tsx`** — root plus per-role
+      boundaries sharing `RoleErrorState`
+- [x] **Image optimisation** — 61 unreferenced assets deleted (`public/` 31 MB → 876 KB), the
+      Next optimiser re-enabled (AVIF/WebP) and avatars defer loading
+- [x] **Form validation with RHF + zod** — `components/ui/form.tsx` primitives plus
+      `lib/validation/schemas.ts`; the users, subjects, classes/sections and settings forms are
+      migrated (the two remaining legacy modals keep their inline checks)
 
-### Phase 7 — QA & deploy ◐ PARTIAL
+### Phase 7 — QA & deploy ✅ COMPLETE
 - [x] API + integration tests — 145 across 12 files
 - [x] Security pass — Helmet, CORS allowlist, `express-rate-limit`, zod on every body
-- [ ] **Test coverage gaps:** `students`, `teachers` and `academic` route files (21
-      endpoints) have no dedicated suite; CRUD happy paths are unexercised
-- [ ] **Lint is not runnable** — `next lint` fails (no ESLint installed/configured);
-      root `npm run lint` therefore exits non-zero
-- [ ] **Deploy** — no `vercel.json`, `Dockerfile`, `railway.json` or `render.yaml`; the
-      backend "build" is a bare tsc invocation with no start-up health probe
-- [ ] **Seed is demo-only** — `seed.ts` wipes and recreates fixtures with `Password123`
-      accounts; there is no "create the first real admin" path for production
+- [x] **Test coverage:** `students`, `teachers` and `academic` suites added — every route file
+      now has tests (203 total across 15 files)
+- [x] **Lint runnable** — ESLint 9 flat config (Next 16 removed `next lint`), `npm run lint`
+      reports 0 errors, and CI runs it before typecheck
+- [x] **Deploy** — `backend/Dockerfile` (multi-stage, non-root, HEALTHCHECK), `railway.json`,
+      `frontend/vercel.json` with security headers, and `docs/DEPLOYMENT.md`
+- [x] **Production seed path** — `scripts/create-admin.ts` bootstraps the first admin from env
+      vars; `seed.ts` now refuses to run with `NODE_ENV=production`
 
 ---
 

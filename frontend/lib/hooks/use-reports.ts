@@ -99,10 +99,22 @@ export function feeTotals(rows: FeeReportRow[]) {
  * Downloads a report CSV through the authenticated API and saves it.
  * `apiFetch` attaches the session cookie; the blob is handed to the browser.
  */
-export async function downloadReportCsv(type: ReportType, days = 30) {
-  const query = type === "attendance" ? `?type=${type}&days=${days}` : `?type=${type}`
+/**
+ * Shared downloader for both report formats.
+ *
+ * Both endpoints stream the file with a `Content-Disposition` filename and the
+ * same query, so only the path and the fallback extension differ.
+ */
+async function downloadReport(
+  type: ReportType,
+  format: "csv" | "pdf",
+  days: number,
+): Promise<string> {
+  const params = new URLSearchParams({ type })
+  if (type === "attendance") params.set("days", String(days))
+  const path = format === "pdf" ? "/reports/export.pdf" : "/reports/export"
 
-  const response = await fetch(`${API_BASE}/reports/export${query}`, {
+  const response = await fetch(`${API_BASE}${path}?${params.toString()}`, {
     credentials: "include",
   })
 
@@ -113,7 +125,7 @@ export async function downloadReportCsv(type: ReportType, days = 30) {
   const blob = await response.blob()
   const disposition = response.headers.get("Content-Disposition") ?? ""
   const match = disposition.match(/filename="([^"]+)"/)
-  const filename = match?.[1] ?? `${type}-report.csv`
+  const filename = match?.[1] ?? `${type}-report.${format}`
 
   const url = URL.createObjectURL(blob)
   const link = document.createElement("a")
@@ -126,3 +138,8 @@ export async function downloadReportCsv(type: ReportType, days = 30) {
 
   return filename
 }
+
+export const downloadReportCsv = (type: ReportType, days = 30) => downloadReport(type, "csv", days)
+
+/** Renders the same rows server-side into a print-ready A4 PDF. */
+export const downloadReportPdf = (type: ReportType, days = 30) => downloadReport(type, "pdf", days)

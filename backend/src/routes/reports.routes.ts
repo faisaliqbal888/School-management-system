@@ -6,6 +6,7 @@ import { authenticate, authorize } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
 import { ok } from '../utils/response.js'
 import * as reports from '../services/reports.service.js'
+import * as reportPdf from '../services/report-pdf.service.js'
 import type { Role } from '@prisma/client'
 
 export const reportsRouter = Router()
@@ -59,6 +60,21 @@ reportsRouter.get(
   authorize('ADMIN'),
   asyncHandler(async (req, res) => {
     ok(res, await reports.enrolmentReport(actorOf(req)))
+  }),
+)
+
+reportsRouter.get(
+  '/reports/export.pdf',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ query: csvQuery }),
+  asyncHandler(async (req, res) => {
+    const { type, days } = req.query as unknown as z.infer<typeof csvQuery>
+    const { filename, buffer } = await reportPdf.reportPdf(actorOf(req), type, days ?? 30)
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+    res.setHeader('Content-Length', String(buffer.length))
+    res.send(buffer)
   }),
 )
 

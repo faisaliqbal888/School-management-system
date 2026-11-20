@@ -4,11 +4,13 @@ A modern **School Management System (SMS)** that digitises school operations —
 attendance, exams, fees, timetable, library, transport, hostel, inventory and payroll — in one
 role-based portal.
 
-> **Status:** Phases 0–6 complete — backend + UI live for auth, academics, students, teachers,
-> attendance, fees, exams/results, timetable, notifications, dashboards, reports with CSV export,
-> library, transport, hostel, inventory, HR/payroll, the user directory, school settings and a
-> live alert feed · **145 backend tests green** · responsive layout with a mobile navigation
-> drawer on every role · every route builds clean and serves live data.
+> **Status:** **All seven phases complete.** Backend + UI live for auth, academics (years,
+> classes, sections, subjects), students, teachers, attendance, fees, exams/results, timetable,
+> notifications, dashboards, reports (CSV **and PDF**), library, transport, hostel, inventory,
+> HR/payroll, the user directory, school settings and a live alert feed.
+> **203 backend tests green** across 15 files · ESLint + typecheck + build clean in CI ·
+> responsive with a mobile navigation drawer on every role · deploy-ready (`Dockerfile`,
+> `railway.json`, `vercel.json`, `docs/DEPLOYMENT.md`).
 > See [`docs/PLAN.md`](docs/PLAN.md) for the full review and roadmap.
 
 ---
@@ -136,7 +138,7 @@ CI runs typecheck + build for the frontend and typecheck + tests for the backend
 | 3 | Students, teachers, attendance, fees — full CRUD + frontend wiring | ✅ |
 | 4 | Exams, timetable, notifications — full backend + UI | ✅ |
 | 5 | Live dashboards, reports, CSV exports | ✅ |
-| 6 | Mobile drawer, loading states, operations pages (library/transport/hostel/inventory/HR), users, settings, alerts | ✅ |
+| 6 | Mobile drawer, error/404 shells, image optimisation (31 MB → 876 KB), RHF + zod forms, operations/admin pages | ✅ |
 | 7 | Tests, security pass, deployment | 🔜 |
 
 Full detail: [`docs/PLAN.md`](docs/PLAN.md)

@@ -235,3 +235,38 @@ describe('reports: CSV export', () => {
     }
   })
 })
+
+describe('reports: PDF export', () => {
+  const types = ['fees', 'attendance', 'performance', 'enrolment']
+
+  it.each(types)('renders a valid PDF for %s', async (type) => {
+    const res = await request(app)
+      .get(`/api/v1/reports/export.pdf?type=${type}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+
+    expect(res.status).toBe(200)
+    expect(res.headers['content-type']).toMatch(/application\/pdf/)
+    expect(res.headers['content-disposition']).toMatch(new RegExp(`attachment; filename=".*${type}.*\\.pdf"`))
+    // %PDF- magic bytes prove the document was actually built.
+    expect(res.body.subarray(0, 5).toString()).toBe('%PDF-')
+    expect(Number(res.headers['content-length'])).toBeGreaterThan(500)
+  })
+
+  it('honours the attendance day window', async () => {
+    const res = await request(app)
+      .get('/api/v1/reports/export.pdf?type=attendance&days=7')
+      .set('Authorization', `Bearer ${adminToken}`)
+    expect(res.status).toBe(200)
+    expect(res.headers['content-disposition']).toMatch(/7d/)
+  })
+
+  it('rejects an unknown report type', async () => {
+    const res = await request(app).get('/api/v1/reports/export.pdf?type=nope').set('Authorization', `Bearer ${adminToken}`)
+    expect(res.status).toBe(400)
+  })
+
+  it('is refused to non-admins', async () => {
+    const res = await request(app).get('/api/v1/reports/export.pdf?type=fees').set('Authorization', `Bearer ${teacherToken}`)
+    expect(res.status).toBe(403)
+  })
+})
