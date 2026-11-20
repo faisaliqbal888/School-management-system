@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -24,8 +23,20 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CheckCircle2, Copy, Key, Loader2, MoreVertical, Search, UserPlus, Users } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useRequireRole } from "@/lib/auth-context"
 import { useUserMutations, useUsers } from "@/lib/hooks/use-admin"
+import { createUserSchema, type CreateUserValues } from "@/lib/validation/schemas"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -52,8 +63,12 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1)
 
   const [createOpen, setCreateOpen] = useState(false)
-  const [form, setForm] = useState({ name: "", email: "", role: "STUDENT", password: "" })
   const [issued, setIssued] = useState<{ name: string; password: string } | null>(null)
+
+  const form = useForm<CreateUserValues>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: { name: "", email: "", role: "STUDENT", password: "" },
+  })
 
   const { users, meta, stats, isLoading, error, refetch } = useUsers({
     page,
@@ -80,23 +95,25 @@ export default function AdminUsersPage() {
     }
   }
 
-  const submitCreate = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const submitCreate = form.handleSubmit(async (values) => {
     try {
       await createUser({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        role: form.role,
+        name: values.name.trim(),
+        email: values.email.trim(),
+        password: values.password,
+        role: values.role,
       })
-      toast.success(`${form.name} added to the directory`)
+      toast.success(`${values.name} added to the directory`)
       setCreateOpen(false)
-      setForm({ name: "", email: "", role: "STUDENT", password: "" })
+      form.reset()
       refetch()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the user")
+      // A duplicate email is only detectable server-side — pin it to the field.
+      const message = err instanceof Error ? err.message : "Could not create the user"
+      if (/already exists/i.test(message)) form.setError("email", { message })
+      else toast.error(message)
     }
-  }
+  })
 
   const stats_ = [
     { label: "Total users", value: stats?.total ?? 0, hint: "all roles" },
@@ -339,56 +356,82 @@ export default function AdminUsersPage() {
               Creates a sign-in account. Link the student or teacher profile from its own page afterwards.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submitCreate} className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="new-name">Full name</Label>
-              <Input
-                id="new-name"
-                required
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
+          <Form {...form}>
+            <form onSubmit={submitCreate} className="space-y-3" noValidate>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full name</FormLabel>
+                    <FormControl>
+                      <Input autoComplete="name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="new-email">Email</Label>
-              <Input
-                id="new-email"
-                type="email"
-                required
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" autoComplete="email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="new-role">Role</Label>
-              <select
-                id="new-role"
-                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
-                value={form.role}
-                onChange={(event) => setForm({ ...form, role: event.target.value })}
-              >
-                {roles.map((entry) => (
-                  <option key={entry} value={entry}>
-                    {entry.charAt(0) + entry.slice(1).toLowerCase()}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="new-password">Temporary password</Label>
-              <Input
-                id="new-password"
-                required
-                minLength={8}
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                placeholder="At least 8 characters"
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role</FormLabel>
+                    <FormControl>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
+                        {...field}
+                      >
+                        {roles.map((entry) => (
+                          <option key={entry} value={entry}>
+                            {entry.charAt(0) + entry.slice(1).toLowerCase()}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? "Creating…" : "Create account"}
-            </Button>
-          </form>
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Temporary password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        autoComplete="new-password"
+                        placeholder="At least 8 characters"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Hand this to the user once — they can change it after signing in.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? "Creating…" : "Create account"}
+              </Button>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

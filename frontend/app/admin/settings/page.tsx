@@ -1,17 +1,20 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useMemo } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2, RotateCcw, Save, School, Wallet, CalendarDays, BellRing } from "lucide-react"
 import { useRequireRole } from "@/lib/auth-context"
 import { useSettings, useUserMutations } from "@/lib/hooks/use-admin"
+import { FormProvider, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { toast } from "sonner"
 
 const GROUPS: { title: string; icon: typeof School; hint: string; keys: string[] }[] = [
@@ -59,15 +62,47 @@ export default function AdminSettingsPage() {
   const { settings, isLoading, error, refetch } = useSettings()
   const { pending, saveSettings } = useUserMutations()
 
-  const [draft, setDraft] = useState<Record<string, string>>({})
-  const [dirty, setDirty] = useState(false)
+  // Every key is free-form text on the wire, so the client schema only guards
+  // the few that have a shape (email, numbers) and lets the server own the rest.
+  const schema = useMemo(
+    () =>
+      z.object(
+        Object.fromEntries(
+          settings.map((entry) => {
+            if (entry.key === "school.email") {
+              return [entry.key, z.string().trim().email("Enter a valid email").or(z.literal(""))]
+            }
+            if (/Percent|Threshold/.test(entry.key)) {
+              return [
+                entry.key,
+                z
+                  .string()
+                  .refine((v) => v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0 && Number(v) <= 100), {
+                    message: "Enter a number between 0 and 100",
+                  }),
+              ]
+            }
+            if (entry.key === "school.name") {
+              return [entry.key, z.string().trim().min(1, "School name is required")]
+            }
+            return [entry.key, z.string()]
+          }),
+        ),
+      ),
+    [settings],
+  )
 
-  useEffect(() => {
-    if (settings.length > 0 && !dirty) {
-      setDraft(Object.fromEntries(settings.map((entry) => [entry.key, entry.value])))
-    }
-  }, [settings, dirty])
+  type SettingsValues = Record<string, string>
 
+  const form = useForm<SettingsValues>({
+    resolver: zodResolver(schema),
+    values: Object.fromEntries(settings.map((entry) => [entry.key, entry.value])),
+  })
+
+  const draft = form.watch()
+
+  // Restoring `values` resets the form, so this also clears the dirty state.
+  const reset = () => form.reset()
   if (!ready) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -77,23 +112,18 @@ export default function AdminSettingsPage() {
   }
 
   const changed = settings.filter((entry) => (draft[entry.key] ?? entry.value) !== entry.value)
+  const dirty = changed.length > 0
 
-  const save = async () => {
+  const save = form.handleSubmit(async (values) => {
     if (changed.length === 0) return
     try {
-      await saveSettings(changed.map((entry) => ({ key: entry.key, value: draft[entry.key] ?? entry.value })))
+      await saveSettings(changed.map((entry) => ({ key: entry.key, value: values[entry.key] ?? "" })))
       toast.success(`Saved ${changed.length} setting${changed.length === 1 ? "" : "s"}`)
-      setDirty(false)
       refetch()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not save settings")
     }
-  }
-
-  const reset = () => {
-    setDraft(Object.fromEntries(settings.map((entry) => [entry.key, entry.value])))
-    setDirty(false)
-  }
+  })
 
   return (
     <div className="min-h-screen bg-background">
@@ -124,7 +154,8 @@ export default function AdminSettingsPage() {
           ) : isLoading ? (
             <Skeleton className="h-72 w-full" />
           ) : (
-            <div className="grid gap-4 lg:grid-cols-2">
+            <FormProvider {...form}>
+          <div className="grid gap-4 lg:grid-cols-2">
               {GROUPS.map((group) => (
                 <Card key={group.title}>
                   <CardHeader className="pb-3">
@@ -138,46 +169,49 @@ export default function AdminSettingsPage() {
                       const stored = settings.find((entry) => entry.key === key)
                       if (!stored) return null
                       const isBoolean = key === "notifications.emailEnabled"
-                      const value = draft[key] ?? stored.value
                       return (
-                        <div key={key} className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor={`setting-${key}`}>{labels[key] ?? key}</Label>
-                            {stored.source === "default" && <Badge variant="outline">default</Badge>}
-                          </div>
-                          {isBoolean ? (
-                            <div className="flex items-center gap-2">
-                              <input
-                                id={`setting-${key}`}
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-input"
-                                checked={value === "true"}
-                                onChange={(event) => {
-                                  setDraft({ ...draft, [key]: event.target.checked ? "true" : "false" })
-                                  setDirty(true)
-                                }}
-                              />
-                              <span className="text-sm text-muted-foreground">
-                                {value === "true" ? "Enabled" : "Disabled"}
-                              </span>
-                            </div>
-                          ) : (
-                            <Input
-                              id={`setting-${key}`}
-                              value={value}
-                              onChange={(event) => {
-                                setDraft({ ...draft, [key]: event.target.value })
-                                setDirty(true)
-                              }}
-                            />
+                        <FormField
+                          key={key}
+                          control={form.control}
+                          name={key}
+                          render={({ field }) => (
+                            <FormItem>
+                              <div className="flex items-center justify-between">
+                                <FormLabel>{labels[key] ?? key}</FormLabel>
+                                {stored.source === "default" && <Badge variant="outline">default</Badge>}
+                              </div>
+                              {isBoolean ? (
+                                <FormControl>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border-input"
+                                      checked={field.value === "true"}
+                                      onChange={(event) =>
+                                        field.onChange(event.target.checked ? "true" : "false")
+                                      }
+                                    />
+                                    <span className="text-sm text-muted-foreground">
+                                      {field.value === "true" ? "Enabled" : "Disabled"}
+                                    </span>
+                                  </div>
+                                </FormControl>
+                              ) : (
+                                <FormControl>
+                                  <Input {...field} value={field.value ?? ""} />
+                                </FormControl>
+                              )}
+                              <FormMessage />
+                            </FormItem>
                           )}
-                        </div>
+                        />
                       )
                     })}
                   </CardContent>
                 </Card>
               ))}
             </div>
+          </FormProvider>
           )}
         </main>
       </div>

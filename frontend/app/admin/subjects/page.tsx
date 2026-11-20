@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Dialog,
@@ -17,11 +16,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Loader2, Pencil, Plus, Search, Trash2 } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useRequireRole } from "@/lib/auth-context"
 import { useAcademicMutations, useClasses, useSubjects, type SubjectRow } from "@/lib/hooks/use-academics"
+import { subjectSchema, type SubjectFormValues } from "@/lib/validation/schemas"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { toast } from "sonner"
 
-const emptyForm = { name: "", code: "", classId: "", creditHours: "1", isElective: false }
+const emptyForm: SubjectFormValues = { name: "", code: "", classId: "", creditHours: 1, isElective: false }
 
 export default function AdminSubjectsPage() {
   const { ready } = useRequireRole("ADMIN")
@@ -33,7 +44,11 @@ export default function AdminSubjectsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<SubjectRow | null>(null)
-  const [form, setForm] = useState(emptyForm)
+
+  const form = useForm<SubjectFormValues>({
+    resolver: zodResolver(subjectSchema),
+    defaultValues: emptyForm,
+  })
 
   if (!ready) {
     return (
@@ -45,30 +60,29 @@ export default function AdminSubjectsPage() {
 
   const openCreate = () => {
     setEditing(null)
-    setForm({ ...emptyForm, classId: classFilter || classes[0]?.id || "" })
+    form.reset({ ...emptyForm, classId: classFilter || classes[0]?.id || "" })
     setDialogOpen(true)
   }
 
   const openEdit = (subject: SubjectRow) => {
     setEditing(subject)
-    setForm({
+    form.reset({
       name: subject.name,
       code: subject.code,
       classId: subject.classId,
-      creditHours: String(subject.creditHours),
+      creditHours: subject.creditHours,
       isElective: subject.isElective,
     })
     setDialogOpen(true)
   }
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const submit = form.handleSubmit(async (values) => {
     const payload = {
-      name: form.name.trim(),
-      code: form.code.trim().toUpperCase(),
-      classId: form.classId,
-      creditHours: Number(form.creditHours),
-      isElective: form.isElective,
+      name: values.name.trim(),
+      code: values.code.trim().toUpperCase(),
+      classId: values.classId,
+      creditHours: values.creditHours,
+      isElective: values.isElective,
     }
     try {
       await saveSubject(payload, editing?.id)
@@ -76,9 +90,12 @@ export default function AdminSubjectsPage() {
       setDialogOpen(false)
       refetch()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save the subject")
+      const message = err instanceof Error ? err.message : "Could not save the subject"
+      // Code clashes are only known server-side.
+      if (/code/i.test(message) && /use|exists/i.test(message)) form.setError("code", { message })
+      else toast.error(message)
     }
-  }
+  })
 
   const remove = async (subject: SubjectRow) => {
     try {
@@ -217,70 +234,101 @@ export default function AdminSubjectsPage() {
               Codes must be unique across the school; a subject belongs to exactly one class.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submit} className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="subj-name">Name</Label>
-              <Input
-                id="subj-name"
-                required
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-                placeholder="Mathematics"
+          <Form {...form}>
+            <form onSubmit={submit} className="space-y-3" noValidate>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Mathematics" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="subj-code">Code</Label>
-                <Input
-                  id="subj-code"
-                  required
-                  value={form.code}
-                  onChange={(event) => setForm({ ...form, code: event.target.value })}
-                  placeholder="MATH-10"
+              <div className="grid grid-cols-2 gap-2">
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="MATH-10" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="creditHours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Credit hours</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} max={10} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="subj-credits">Credit hours</Label>
-                <Input
-                  id="subj-credits"
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={form.creditHours}
-                  onChange={(event) => setForm({ ...form, creditHours: event.target.value })}
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="subj-class">Class</Label>
-              <select
-                id="subj-class"
-                required
-                className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
-                value={form.classId}
-                onChange={(event) => setForm({ ...form, classId: event.target.value })}
-              >
-                <option value="">Select a class…</option>
-                {classes.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {cls.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-input"
-                checked={form.isElective}
-                onChange={(event) => setForm({ ...form, isElective: event.target.checked })}
+              <FormField
+                control={form.control}
+                name="classId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Class</FormLabel>
+                    <FormControl>
+                      <select
+                        className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
+                        {...field}
+                      >
+                        <option value="">Select a class…</option>
+                        {classes.map((cls) => (
+                          <option key={cls.id} value={cls.id}>
+                            {cls.name}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              Elective subject
-            </label>
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? "Saving…" : editing ? "Save changes" : "Create subject"}
-            </Button>
-          </form>
+              <FormField
+                control={form.control}
+                name="isElective"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="is-elective"
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-input"
+                        checked={field.value}
+                        onChange={field.onChange}
+                      />
+                      <FormLabel htmlFor="is-elective" className="!mt-0">
+                        Elective subject
+                      </FormLabel>
+                    </div>
+                    <FormDescription>
+                      Electives count towards the result average only when taken.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full" disabled={isPending}>
+                {isPending ? "Saving…" : editing ? "Save changes" : "Create subject"}
+              </Button>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>

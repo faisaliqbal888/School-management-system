@@ -1,10 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,7 +16,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { BookOpen, Loader2, Plus, Trash2, Users } from "lucide-react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useRequireRole } from "@/lib/auth-context"
+import { classSchema, sectionSchema, type ClassFormValues, type SectionFormValues } from "@/lib/validation/schemas"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import {
   useAcademicMutations,
   useAcademicYears,
@@ -33,22 +43,26 @@ export default function AdminClassesPage() {
   const { ready } = useRequireRole("ADMIN")
   const { years, isLoading: yearsLoading } = useAcademicYears()
   const [yearId, setYearId] = useState<string>("")
-  const { classes, isLoading, error, refetch } = useClasses(yearId || undefined)
+
+  // Derive the year instead of syncing it into state: no effect, no cascading
+  // render, and the select still shows a sensible default on first paint.
+  const effectiveYearId = yearId || (years.find((year) => year.isCurrent) ?? years[0])?.id || ""
+  const { classes, isLoading, error, refetch } = useClasses(effectiveYearId || undefined)
   const { saveClass, deleteClass, saveSection, deleteSection, isPending } = useAcademicMutations()
 
   const [selected, setSelected] = useState<ClassRow | null>(null)
-  const [classForm, setClassForm] = useState({ name: "", level: "", capacity: "40" })
   const [classDialog, setClassDialog] = useState(false)
-  const [sectionForm, setSectionForm] = useState({ name: "", roomNo: "", capacity: "40" })
+
+  const classForm = useForm<ClassFormValues>({
+    resolver: zodResolver(classSchema),
+    defaultValues: { name: "", level: 1, capacity: 40 },
+  })
+  const sectionForm = useForm<SectionFormValues>({
+    resolver: zodResolver(sectionSchema),
+    defaultValues: { name: "", roomNo: "", capacity: 40 },
+  })
 
   const { sections, isLoading: sectionsLoading, refetch: refetchSections } = useSections(selected?.id ?? null)
-
-  // Default to the current academic year once the list arrives.
-  useEffect(() => {
-    if (!yearId && years.length > 0) {
-      setYearId((years.find((year) => year.isCurrent) ?? years[0]!).id)
-    }
-  }, [years, yearId])
 
   if (!ready) {
     return (
@@ -58,43 +72,38 @@ export default function AdminClassesPage() {
     )
   }
 
-  const submitClass = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (!yearId) return toast.error("Pick an academic year first")
+  const submitClass = classForm.handleSubmit(async (values) => {
+    if (!effectiveYearId) return toast.error("Pick an academic year first")
     try {
-      await saveClass({
-        name: classForm.name.trim(),
-        level: Number(classForm.level),
-        capacity: Number(classForm.capacity),
-        academicYearId: yearId,
-      })
-      toast.success(`Class "${classForm.name}" created`)
+      await saveClass({ ...values, name: values.name.trim(), academicYearId: effectiveYearId })
+      toast.success(`Class "${values.name}" created`)
       setClassDialog(false)
-      setClassForm({ name: "", level: "", capacity: "40" })
+      classForm.reset()
       refetch()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the class")
+      const message = err instanceof Error ? err.message : "Could not create the class"
+      if (/already exists/i.test(message)) classForm.setError("name", { message })
+      else toast.error(message)
     }
-  }
+  })
 
-  const submitSection = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const submitSection = sectionForm.handleSubmit(async (values) => {
     if (!selected) return
     try {
       await saveSection({
         classId: selected.id,
-        name: sectionForm.name.trim().toUpperCase(),
-        roomNo: sectionForm.roomNo.trim() || null,
-        capacity: Number(sectionForm.capacity),
+        name: values.name.trim().toUpperCase(),
+        roomNo: values.roomNo?.trim() || null,
+        capacity: values.capacity,
       })
-      toast.success(`Section ${sectionForm.name.toUpperCase()} added`)
-      setSectionForm({ name: "", roomNo: "", capacity: "40" })
+      toast.success(`Section ${values.name.toUpperCase()} added`)
+      sectionForm.reset()
       refetchSections()
       refetch()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not add the section")
     }
-  }
+  })
 
   const removeClass = async (cls: ClassRow) => {
     try {
@@ -138,7 +147,7 @@ export default function AdminClassesPage() {
                 <select
                   id="year-select"
                   className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
-                  value={yearId}
+                  value={effectiveYearId}
                   onChange={(event) => {
                     setYearId(event.target.value)
                     setSelected(null)
@@ -153,7 +162,7 @@ export default function AdminClassesPage() {
                   ))}
                 </select>
               </div>
-              <Button onClick={() => setClassDialog(true)} disabled={!yearId}>
+              <Button onClick={() => setClassDialog(true)} disabled={!effectiveYearId}>
                 <Plus className="mr-2 h-4 w-4" /> New class
               </Button>
             </div>
@@ -279,50 +288,54 @@ export default function AdminClassesPage() {
                         </div>
                       )}
 
-                      <form onSubmit={submitSection} className="space-y-2 border-t pt-3">
-                        <div className="grid grid-cols-3 gap-2">
-                          <div className="space-y-1">
-                            <Label htmlFor="sec-name" className="text-xs">
-                              Name
-                            </Label>
-                            <Input
-                              id="sec-name"
-                              required
-                              maxLength={5}
-                              value={sectionForm.name}
-                              onChange={(event) => setSectionForm({ ...sectionForm, name: event.target.value })}
-                              placeholder="C"
+                      <Form {...sectionForm}>
+                        <form onSubmit={submitSection} className="space-y-2 border-t pt-3" noValidate>
+                          <div className="grid grid-cols-3 gap-2">
+                            <FormField
+                              control={sectionForm.control}
+                              name="name"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Name</FormLabel>
+                                  <FormControl>
+                                    <Input maxLength={5} placeholder="C" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={sectionForm.control}
+                              name="roomNo"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Room</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="R-12" {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={sectionForm.control}
+                              name="capacity"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-xs">Capacity</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" min={1} max={200} {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
                           </div>
-                          <div className="space-y-1">
-                            <Label htmlFor="sec-room" className="text-xs">
-                              Room
-                            </Label>
-                            <Input
-                              id="sec-room"
-                              value={sectionForm.roomNo}
-                              onChange={(event) => setSectionForm({ ...sectionForm, roomNo: event.target.value })}
-                              placeholder="R-12"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor="sec-cap" className="text-xs">
-                              Capacity
-                            </Label>
-                            <Input
-                              id="sec-cap"
-                              type="number"
-                              min={1}
-                              max={200}
-                              value={sectionForm.capacity}
-                              onChange={(event) => setSectionForm({ ...sectionForm, capacity: event.target.value })}
-                            />
-                          </div>
-                        </div>
-                        <Button type="submit" size="sm" className="w-full" disabled={isPending}>
-                          <Plus className="mr-2 h-4 w-4" /> Add section
-                        </Button>
-                      </form>
+                          <Button type="submit" size="sm" className="w-full" disabled={isPending}>
+                            <Plus className="mr-2 h-4 w-4" /> Add section
+                          </Button>
+                        </form>
+                      </Form>
                     </>
                   )}
                 </CardContent>
@@ -351,46 +364,54 @@ export default function AdminClassesPage() {
             <DialogTitle>New class</DialogTitle>
             <DialogDescription>Added to the selected academic year.</DialogDescription>
           </DialogHeader>
-          <form onSubmit={submitClass} className="space-y-3">
-            <div className="space-y-1">
-              <Label htmlFor="cls-name">Name</Label>
-              <Input
-                id="cls-name"
-                required
-                value={classForm.name}
-                onChange={(event) => setClassForm({ ...classForm, name: event.target.value })}
-                placeholder="Grade 6"
+          <Form {...classForm}>
+            <form onSubmit={submitClass} className="space-y-3" noValidate>
+              <FormField
+                control={classForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Grade 6" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label htmlFor="cls-level">Level</Label>
-                <Input
-                  id="cls-level"
-                  type="number"
-                  required
-                  min={1}
-                  max={20}
-                  value={classForm.level}
-                  onChange={(event) => setClassForm({ ...classForm, level: event.target.value })}
+              <div className="grid grid-cols-2 gap-2">
+                <FormField
+                  control={classForm.control}
+                  name="level"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Level</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} max={20} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={classForm.control}
+                  name="capacity"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Capacity</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} max={200} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="cls-cap">Capacity</Label>
-                <Input
-                  id="cls-cap"
-                  type="number"
-                  min={1}
-                  max={200}
-                  value={classForm.capacity}
-                  onChange={(event) => setClassForm({ ...classForm, capacity: event.target.value })}
-                />
-              </div>
-            </div>
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? "Creating…" : "Create class"}
-            </Button>
-          </form>
+              <Button type="submit" className="w-full" disabled={isPending}>
+                {isPending ? "Creating…" : "Create class"}
+              </Button>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
