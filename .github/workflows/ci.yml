@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/school_db?schema=public
+  JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
+  JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
+
+# This is an npm *workspaces* repo: a single lockfile at the root installs both
+# packages, and the workspace dependencies (`next`, `prisma`, …) are hoisted into
+# `frontend/node_modules` or `backend/node_modules` by npm. Installing with
+# `working-directory: frontend` would therefore look for a lockfile that does not
+# exist, so every job installs from the root and only the *commands* run in the
+# workspace directory.
+jobs:
+  frontend:
+    name: Frontend — lint, typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      # Next 16 removed `next lint`; the script runs ESLint 9 directly.
+      - run: npm run lint --workspace=frontend
+      - run: npm run typecheck --workspace=frontend
+      - run: npm run build --workspace=frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+  backend:
+    name: Backend — typecheck, migrate & test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: school_db
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      # Generates the Prisma client without downloading native engines
+      # (WASM query compiler — see backend/scripts/generate-client.cjs)
+      - run: npm run prisma:generate --workspace=backend
+
+      # Apply the checked-in migration SQL to the CI database
+      - run: npm run migrate:deploy --workspace=backend
+
+      - run: npm run typecheck --workspace=backend
+      - run: npm test --workspace=backend
