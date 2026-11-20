@@ -393,7 +393,7 @@ Every route below is served under `/api/v1` and shares the envelope
 |---|---|
 | Health | `GET /health`, `GET /health/ready` |
 | Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me`, `PATCH /auth/me/password` |
-| Academics | `GET/POST /classes`, `/sections`, `/subjects`, `GET /academic-years` |
+| Academics | `GET/POST/PATCH/DELETE /classes`, `/sections`, `/subjects`, `/academic-years`, `GET /classes/:id/sections` |
 | Students | `GET/POST /students`, `GET/PATCH/DELETE /students/:id`, `GET /students/:id/attendance`, `/students/:id/invoices` |
 | Teachers | `GET/POST /teachers`, `GET/PATCH/DELETE /teachers/:id`, `GET /teachers/options` |
 | Attendance | `POST /attendance/bulk`, `GET /attendance?classId&sectionId&date`, `GET /attendance/summary`, `GET /attendance/today` |

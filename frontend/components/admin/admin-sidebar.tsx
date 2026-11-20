@@ -47,6 +47,8 @@ const navigation = [
   { name: "Attendance", href: "/admin/attendance", icon: ClipboardCheck },
   { name: "Fees & Payments", href: "/admin/fees", icon: CreditCard },
   { name: "Exams & Results", href: "/admin/exams", icon: FileText },
+  { name: "Classes & Sections", href: "/admin/classes", icon: GraduationCap },
+  { name: "Subjects", href: "/admin/subjects", icon: BookOpen },
   { name: "Timetable", href: "/admin/timetable", icon: Calendar },
   { name: "Notifications", href: "/admin/notifications", icon: Megaphone },
   { name: "Library", href: "/admin/library", icon: BookOpen },

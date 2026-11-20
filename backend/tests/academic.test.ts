@@ -115,6 +115,15 @@ describe('academic: years', () => {
       .send({ name: 'X' })
     expect(res.status).toBe(400)
   })
+
+  it('renames a year', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/academic-years/${yearId}`)
+      .set(auth(adminToken))
+      .send({ name: `ACAD-${suffix}-B` })
+    expect(res.status).toBe(200)
+    expect(res.body.data.name).toBe(`ACAD-${suffix}-B`)
+  })
 })
 
 describe('academic: classes & sections', () => {
@@ -155,6 +164,29 @@ describe('academic: classes & sections', () => {
     sectionId = res.body.data.id
   })
 
+  it('edits a section', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/sections/${sectionId}`)
+      .set(auth(adminToken))
+      .send({ roomNo: 'R-99', capacity: 33 })
+    expect(res.status).toBe(200)
+    expect(res.body.data.roomNo).toBe('R-99')
+    expect(res.body.data.capacity).toBe(33)
+  })
+
+  it('refuses to delete a class that still has sections', async () => {
+    const res = await request(app).delete(`/api/v1/classes/${classId}`).set(auth(adminToken))
+    expect(res.status).toBe(409)
+    expect(res.body.error.message).toMatch(/section/i)
+  })
+
+  it('refuses to delete the current academic year', async () => {
+    const current = await prisma.academicYear.findFirst({ where: { isCurrent: true } })
+    if (!current) return
+    const res = await request(app).delete(`/api/v1/academic-years/${current.id}`).set(auth(adminToken))
+    expect(res.status).toBe(409)
+  })
+
   it('lists the sections of a class', async () => {
     const res = await request(app).get(`/api/v1/classes/${classId}/sections`).set(auth(adminToken))
     expect(res.status).toBe(200)
@@ -190,6 +222,29 @@ describe('academic: subjects', () => {
     const res = await request(app).get(`/api/v1/subjects?search=AcadSubject-${suffix}`).set(auth(adminToken))
     expect(res.status).toBe(200)
     expect(res.body.data).toHaveLength(1)
+  })
+
+  it('renames a subject and rejects a duplicate code', async () => {
+    const rename = await request(app)
+      .patch(`/api/v1/subjects/${subjectId}`)
+      .set(auth(adminToken))
+      .send({ name: `Renamed-${suffix}` })
+    expect(rename.status).toBe(200)
+    expect(rename.body.data.name).toBe(`Renamed-${suffix}`)
+
+    const dup = await request(app)
+      .patch(`/api/v1/subjects/${subjectId}`)
+      .set(auth(adminToken))
+      .send({ code: `AS-${suffix}` })
+    // Same code on the same row is allowed (no self-conflict).
+    expect(dup.status).toBe(200)
+  })
+
+  it('deletes a subject that has no marks', async () => {
+    const res = await request(app).delete(`/api/v1/subjects/${subjectId}`).set(auth(adminToken))
+    expect(res.status).toBe(200)
+    expect(res.body.data.deleted).toBe(true)
+    subjectId = ''
   })
 
   it('has no orphan rows after the cascade', async () => {

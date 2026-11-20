@@ -211,3 +211,208 @@ academicRouter.post(
     created(res, await prisma.subject.create({ data }))
   }),
 )
+
+// ═════════════════════════════════════════════════════════════
+//  MUTATIONS — edit & archive
+//
+//  Structural records are never hard-deleted while anything references them:
+//  an enrolment, timetable slot or mark would lose its anchor. Deletes
+//  therefore mean "archive" and report what is holding the row.
+// ═════════════════════════════════════════════════════════════
+
+const idParam = z.object({ id: z.string().min(1) })
+
+// ── Academic year ────────────────────────────────────────────
+academicRouter.patch(
+  '/academic-years/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: academicYearBody.partial() }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const data = req.body as Partial<z.infer<typeof academicYearBody>>
+
+    const existing = await prisma.academicYear.findUnique({ where: { id } })
+    if (!existing) throw notFound('Academic year')
+
+    if (data.isCurrent) {
+      await prisma.academicYear.updateMany({ where: { isCurrent: true }, data: { isCurrent: false } })
+    }
+
+    ok(res, await prisma.academicYear.update({ where: { id }, data }))
+  }),
+)
+
+academicRouter.delete(
+  '/academic-years/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const year = await prisma.academicYear.findUnique({
+      where: { id },
+      include: { _count: { select: { classes: true, enrollments: true } } },
+    })
+    if (!year) throw notFound('Academic year')
+    if (year.isCurrent) throw conflict('This academic year is current — mark another year current first')
+    if (year._count.classes > 0 || year._count.enrollments > 0) {
+      throw conflict(
+        `Year still has ${year._count.classes} class(es) and ${year._count.enrollments} enrolment(s)`,
+      )
+    }
+
+    await prisma.academicYear.delete({ where: { id } })
+    ok(res, { deleted: true, id })
+  }),
+)
+
+// ── Class ────────────────────────────────────────────────────
+academicRouter.patch(
+  '/classes/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: classBody.partial() }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const data = req.body as Partial<z.infer<typeof classBody>>
+
+    const existing = await prisma.class.findUnique({ where: { id } })
+    if (!existing) throw notFound('Class')
+
+    // Renaming within the same year must stay unique.
+    if (data.name && data.name !== existing.name) {
+      const dup = await prisma.class.findFirst({
+        where: {
+          name: data.name,
+          academicYearId: data.academicYearId ?? existing.academicYearId,
+          id: { not: id },
+        },
+      })
+      if (dup) throw conflict(`Class "${data.name}" already exists in this academic year`)
+    }
+
+    if (data.classTeacherId) {
+      const teacher = await prisma.teacher.findUnique({ where: { id: data.classTeacherId } })
+      if (!teacher) throw notFound('Class teacher')
+    }
+
+    ok(res, await prisma.class.update({ where: { id }, data }))
+  }),
+)
+
+academicRouter.delete(
+  '/classes/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const cls = await prisma.class.findUnique({
+      where: { id },
+      include: { _count: { select: { sections: true, students: true, subjects: true, enrollments: true } } },
+    })
+    if (!cls) throw notFound('Class')
+
+    const blockers = [
+      cls._count.students > 0 && `${cls._count.students} student(s)`,
+      cls._count.enrollments > 0 && `${cls._count.enrollments} enrolment(s)`,
+      cls._count.sections > 0 && `${cls._count.sections} section(s)`,
+      cls._count.subjects > 0 && `${cls._count.subjects} subject(s)`,
+    ].filter(Boolean)
+
+    if (blockers.length > 0) {
+      throw conflict(`Cannot delete "${cls.name}" — it still has ${blockers.join(', ')}`)
+    }
+
+    await prisma.class.delete({ where: { id } })
+    ok(res, { deleted: true, id })
+  }),
+)
+
+// ── Section ──────────────────────────────────────────────────
+academicRouter.patch(
+  '/sections/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: sectionBody.partial() }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const existing = await prisma.section.findUnique({ where: { id } })
+    if (!existing) throw notFound('Section')
+
+    ok(res, await prisma.section.update({ where: { id }, data: req.body }))
+  }),
+)
+
+academicRouter.delete(
+  '/sections/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const section = await prisma.section.findUnique({
+      where: { id },
+      include: { _count: { select: { enrollments: true, timetable: true } } },
+    })
+    if (!section) throw notFound('Section')
+
+    if (section._count.enrollments > 0 || section._count.timetable > 0) {
+      throw conflict(
+        `Section "${section.name}" still has ${section._count.enrollments} enrolment(s) and ` +
+          `${section._count.timetable} timetable slot(s)`,
+      )
+    }
+
+    await prisma.section.delete({ where: { id } })
+    ok(res, { deleted: true, id })
+  }),
+)
+
+// ── Subject ──────────────────────────────────────────────────
+academicRouter.patch(
+  '/subjects/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: subjectBody.partial() }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const data = req.body as Partial<z.infer<typeof subjectBody>>
+
+    const existing = await prisma.subject.findUnique({ where: { id } })
+    if (!existing) throw notFound('Subject')
+
+    if (data.code && data.code !== existing.code) {
+      const dup = await prisma.subject.findUnique({ where: { code: data.code } })
+      if (dup) throw conflict(`Subject code "${data.code}" is already in use`)
+    }
+
+    ok(res, await prisma.subject.update({ where: { id }, data }))
+  }),
+)
+
+academicRouter.delete(
+  '/subjects/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    const id = String(req.params['id'])
+    const subject = await prisma.subject.findUnique({
+      where: { id },
+      include: { _count: { select: { results: true, timetable: true } } },
+    })
+    if (!subject) throw notFound('Subject')
+
+    if (subject._count.results > 0 || subject._count.timetable > 0) {
+      throw conflict(
+        `Subject "${subject.name}" has ${subject._count.results} result(s) and ` +
+          `${subject._count.timetable} timetable slot(s) — mark it elective-off instead of deleting`,
+      )
+    }
+
+    await prisma.subject.delete({ where: { id } })
+    ok(res, { deleted: true, id })
+  }),
+)

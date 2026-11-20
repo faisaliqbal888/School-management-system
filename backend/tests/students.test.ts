@@ -114,14 +114,19 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await prisma.enrollment.deleteMany({ where: { student: { admissionNo: { startsWith: `STU-N-${suffix}` } } } })
+  // Children first: enrolments and guardians reference the student, and the
+  // class cannot go while any enrolment or student still points at it.
+  await prisma.enrollment.deleteMany({ where: { studentId: { in: createdStudentIds } } })
+  await prisma.enrollment.deleteMany({ where: { student: { admissionNo: { startsWith: 'ADM-' } , userId: { in: createdUserIds } } } })
   for (const id of createdStudentIds) {
     await prisma.guardian.deleteMany({ where: { studentId: id } })
     await prisma.student.deleteMany({ where: { id } })
   }
   await prisma.parent.deleteMany({ where: { user: { email: `stu-parent-${suffix}@test.pk` } } })
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } })
-  await prisma.section.deleteMany({ where: { id: sectionId } })
+  await prisma.enrollment.deleteMany({ where: { classId } })
+  await prisma.student.deleteMany({ where: { classId } })
+  await prisma.section.deleteMany({ where: { classId } })
   await prisma.class.deleteMany({ where: { id: classId } })
   await prisma.academicYear.deleteMany({ where: { name: `STU-${suffix}` } })
   await prisma.$disconnect()

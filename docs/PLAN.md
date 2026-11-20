@@ -106,8 +106,9 @@ School-management-system/
 ### Phase 3 — Core modules ✅ COMPLETE
 Students · Teachers · Classes/Subjects · Attendance · Fees
 Full CRUD API + validation (zod) + pagination/filter/sort + frontend wiring
-- **Gap:** `/classes`, `/sections`, `/subjects` are read/create API-only — there is no admin
-  screen to edit or archive them (students pages only consume `/classes` for dropdowns)
+- [x] Classes & sections screens (`/admin/classes`) and subjects (`/admin/subjects`) on top of
+      full PATCH/DELETE endpoints; deletes refuse while enrolments, sections, marks or timetable
+      slots still reference the row and explain what is attached
 
 ### Phase 4 — Secondary modules ✅ COMPLETE
 Exams/Results · Timetable · Notifications · Library · Transport · Hostel · Inventory · HR/Payroll
