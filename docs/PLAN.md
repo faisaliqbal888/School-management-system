@@ -38,6 +38,9 @@
 | Student / Teacher portals | ✅ | 🔴 demo |
 | **Parent portal** | ❌ | ❌ promised in README, absent in code |
 
+> **Note:** this table is the *original* audit (pre-Phase 0). Current state is tracked by the
+> phase checklist in §3 and by the endpoint map in `API.md`.
+
 ---
 
 ## 2. Target repository layout
@@ -74,15 +77,15 @@ School-management-system/
 
 ## 3. Phases
 
-### Phase 0 — Stabilize & restructure (in progress)
+### Phase 0 — Stabilize & restructure ✅ COMPLETE
 - [x] Full code review + decisions captured
-- [ ] Move app into `frontend/`
-- [ ] Delete 14 legacy duplicate pages + 2 legacy layout components
-- [ ] Fix build: add `react-is`, remove `ignoreBuildErrors`, fix 4 TS errors
-- [ ] Upgrade Next.js `16.0.7` → `16.4.6` (security)
-- [ ] Pin all `"latest"` deps to exact installed versions
-- [ ] Remove Google-Fonts build-time fetch (offline/CI safe)
-- [ ] `.env.example`, GitHub Actions CI, root workspace scripts
+- [x] Move app into `frontend/`
+- [x] Delete 14 legacy duplicate pages + 2 legacy layout components
+- [x] Fix build: add `react-is`, remove `ignoreBuildErrors`, fix 4 TS errors
+- [x] Upgrade Next.js `16.0.7` → `16.4.6` (security)
+- [x] Pin all `"latest"` deps to exact installed versions
+- [x] Remove Google-Fonts build-time fetch (offline/CI safe)
+- [x] `.env.example`, GitHub Actions CI, root workspace scripts
 
 ### Phase 1 — Backend foundation ✅ COMPLETE
 - Express + TS scaffold, config loader, Prisma + PostgreSQL
@@ -100,23 +103,41 @@ School-management-system/
 - Frontend: real login form → API, httpOnly cookie/token storage, role guards
 - Server-side route protection (Next middleware / layout checks)
 
-### Phase 3 — Core modules (days 16–29)
+### Phase 3 — Core modules ✅ COMPLETE
 Students · Teachers · Classes/Subjects · Attendance · Fees
 Full CRUD API + validation (zod) + pagination/filter/sort + frontend wiring
+- **Gap:** `/classes`, `/sections`, `/subjects` are read/create API-only — there is no admin
+  screen to edit or archive them (students pages only consume `/classes` for dropdowns)
 
-### Phase 4 — Secondary modules (days 30–43)
+### Phase 4 — Secondary modules ✅ COMPLETE
 Exams/Results · Timetable · Notifications · Library · Transport · Hostel · Inventory · HR/Payroll
 
-### Phase 5 — Dashboards & Reports (days 44–50)
+### Phase 5 — Dashboards & Reports ✅ COMPLETE
 Real aggregated stats, charts from DB, CSV/PDF export, admin report builder
+- **Gap:** export is **CSV only** — PDF was in the plan and is not implemented
 
-### Phase 6 — Frontend cleanup (days 51–57)
-Mobile drawer navigation, loading/error/empty states, image optimisation
-(WebP + lazy loading), remove dead demo arrays, form validation with RHF + zod
+### Phase 6 — Frontend cleanup ◐ MOSTLY COMPLETE
+- [x] Mobile drawer navigation (shared `mobile-nav.tsx` on all four roles)
+- [x] Remove dead demo arrays, mock API routes and orphan components
+- [x] Loading / empty states on the rebuilt pages
+- [ ] **Route-level `error.tsx` / `not-found.tsx`** — none exist, an API failure shows a
+      blank boundary instead of a recoverable screen
+- [ ] **Image optimisation** — `public/` is 31 MB across 69 files and only 3 are referenced;
+      `images.unoptimized: true` is still set
+- [ ] **Form validation with RHF + zod** — `react-hook-form` and `zod` are installed but no
+      form uses them; every form validates ad hoc (`if (!form.name) …`)
 
-### Phase 7 — QA & deploy (days 58–64)
-API + integration tests, security pass (rate limit, Helmet, CORS, input sanitise),
-Vercel (frontend) + Railway/Render (backend + Postgres), final docs
+### Phase 7 — QA & deploy ◐ PARTIAL
+- [x] API + integration tests — 145 across 12 files
+- [x] Security pass — Helmet, CORS allowlist, `express-rate-limit`, zod on every body
+- [ ] **Test coverage gaps:** `students`, `teachers` and `academic` route files (21
+      endpoints) have no dedicated suite; CRUD happy paths are unexercised
+- [ ] **Lint is not runnable** — `next lint` fails (no ESLint installed/configured);
+      root `npm run lint` therefore exits non-zero
+- [ ] **Deploy** — no `vercel.json`, `Dockerfile`, `railway.json` or `render.yaml`; the
+      backend "build" is a bare tsc invocation with no start-up health probe
+- [ ] **Seed is demo-only** — `seed.ts` wipes and recreates fixtures with `Password123`
+      accounts; there is no "create the first real admin" path for production
 
 ---
 
