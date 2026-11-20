@@ -4,8 +4,9 @@ A modern **School Management System (SMS)** that digitises school operations —
 attendance, exams, fees, timetable, library, transport, hostel, inventory and payroll — in one
 role-based portal.
 
-> **Status:** Phases 0–3 complete · backend live for auth, academics, students, teachers,
-> attendance and fees · 46 backend tests green · frontend builds 46/46 routes.
+> **Status:** Phases 0–3 complete · Phase 4 in progress — backend + UI live for auth, academics,
+> students, teachers, attendance, fees, exams/results, timetable and notifications ·
+> 102 backend tests green · frontend builds clean (all routes prerender).
 > See [`docs/PLAN.md`](docs/PLAN.md) for the full review and roadmap.
 
 ---
@@ -126,10 +127,10 @@ CI runs typecheck + build for the frontend and typecheck + tests for the backend
 | Phase | Scope | Status |
 |---|---|---|:--:|
 | 0 | Restructure, build fixes, security upgrade, CI | ✅ |
-| 1 | Backend foundation, 34-model schema, migrations, seed, academic API | ✅ |
+| 1 | Backend foundation, 35-model schema, migrations, seed, academic API | ✅ |
 | 2 | Real auth (JWT + refresh), RBAC, parent role, frontend login | ✅ |
 | 3 | Students, teachers, attendance, fees — full CRUD + frontend wiring | ✅ |
-| 4 | Exams, timetable, notifications, library, transport, hostel, inventory, HR | 🔜 |
+| 4 | Exams ✅, timetable ✅, notifications ✅ · library, transport, hostel, inventory, HR next | ◐ |
 | 5 | Live dashboards, reports, CSV/PDF exports | 🔜 |
 | 6 | Mobile drawer, loading states, image optimisation, remove demo data | 🔜 |
 | 7 | Tests, security pass, deployment | 🔜 |

@@ -212,6 +212,7 @@ model User {
   parent        Parent?
   refreshTokens RefreshToken[]
   sentNotifications Notification[] @relation("NotificationAuthor")
+  notificationReads NotificationRead[]
   auditLogs     AuditLog[]
 
   @@index([role, status])
@@ -716,9 +717,25 @@ model Notification {
 
   author User?   @relation("NotificationAuthor", fields: [authorId], references: [id], onDelete: SetNull)
   class  Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
+  reads  NotificationRead[]
 
   @@index([audience, createdAt])
   @@map("notifications")
+}
+
+/// Per-user read receipt — the inbox is per-user even though notices are broadcast.
+model NotificationRead {
+  id             String   @id @default(cuid())
+  notificationId String
+  userId         String
+  readAt         DateTime @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId, readAt])
+  @@map("notification_reads")
 }
 
 // ═════════════════════════════════════════════════════════════

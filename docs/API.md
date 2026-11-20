@@ -201,6 +201,65 @@ refreshed on every read. Payments: `CASH | BANK_TRANSFER | CARD | ONLINE | CHEQU
 
 ---
 
+## Exams, marks & report cards
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/exams` | authenticated | Paginated — `classId`, `subjectId`, `type`, `status`, `search` |
+| POST | `/exams` | ADMIN, TEACHER | `{ title, classId, subjectId, type, date, startTime?, endTime?, totalMarks, passingMarks, sectionId? }` |
+| GET | `/exams/:id` | scoped | Exam with roster and stats |
+| PATCH | `/exams/:id/status` | ADMIN | `SCHEDULED → ONGOING → COMPLETED → PUBLISHED`; publishing needs ≥1 result |
+| DELETE | `/exams/:id` | ADMIN | Removes exam and its results |
+| GET | `/exams/:id/marks` | ADMIN, TEACHER | Marks roster — every active student of the section |
+| POST | `/exams/:id/marks` | ADMIN, TEACHER | `{ entries: [{ studentId, marksObtained \| null, remarks? }] }` — null clears; locked once published |
+| GET | `/exams/:id/analysis` | ADMIN, TEACHER | Count, average, highest/lowest, pass rate, grade bands, toppers |
+| GET | `/results` | scoped | Published results; learners see only their own (parents: their children) |
+| GET | `/results/transcript` | STUDENT, PARENT | `?studentId=` for parents — per-subject history + overall % |
+
+Grading: `A+ ≥90 · A ≥80 · B ≥70 · C ≥60 · D ≥50 · E ≥40 · F <40`. A learner passes when
+`marksObtained ≥ passingMarks`. Marks are frozen once an exam is `PUBLISHED`.
+
+---
+
+## Timetable
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/timetable/me` | authenticated | Own section (learner/parent) or own schedule (teacher) |
+| GET | `/timetable/today` | authenticated | Today's classes — dashboard widget, `isCurrent` flag per slot |
+| GET | `/timetable/options` | ADMIN, TEACHER | Classes + sections + subjects + active teachers for the editor |
+| GET | `/timetable/section/:sectionId` | scoped | Weekly grid; learners/parents limited to their own sections |
+| GET | `/timetable/teacher[/:teacherId]` | ADMIN, TEACHER | One teacher's schedule (teachers: self only) |
+| POST | `/timetable/slots` | ADMIN | `{ classId, sectionId?, subjectId, teacherId?, dayOfWeek, startTime, endTime, roomNo? }` |
+| PATCH | `/timetable/slots/:id` | ADMIN | Partial update |
+| DELETE | `/timetable/slots/:id` | ADMIN | Remove a period |
+
+Times are `HH:MM` (24h); `endTime` must be after `startTime`. Two conflicts are rejected with
+`409`: the same section already has a lesson at that day/period, or the teacher is already booked
+elsewhere at that time. Subject must belong to the chosen class (`400`).
+
+---
+
+## Notifications
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/notifications` | authenticated | Inbox — audience-scoped, `unreadOnly`, `audience`, `search` |
+| GET | `/notifications/unread-count` | authenticated | `{ total, unread }` for the badge |
+| GET | `/notifications/options` | ADMIN, TEACHER | Allowed audiences + classes (teachers: own classes only) |
+| GET | `/notifications/stats` | ADMIN | Total notices, active accounts, read counts for recent notices |
+| POST | `/notifications` | ADMIN, TEACHER | `{ title, body, audience, classId?, channel? }` |
+| POST | `/notifications/read-all` | authenticated | Marks every visible notice read → `{ marked }` |
+| GET | `/notifications/:id` | scoped | Single notice — 404 when outside your audience |
+| PATCH | `/notifications/:id` | authenticated | `{ read: true \| false }` toggles the read receipt |
+| DELETE | `/notifications/:id` | ADMIN, TEACHER | Admin deletes any; teachers only their own |
+
+Audiences: `ALL · ADMINS · TEACHERS · STUDENTS · PARENTS · CLASS`. Read state is per user
+(`notification_reads`), so a broadcast stays unread until each account opens it. Teachers may
+target `STUDENTS`, `PARENTS` or one of their own classes — never `ALL` or another class.
+
+---
+
 ## Query parameters (list endpoints)
 
 | Param | Type | Default | Notes |
@@ -213,7 +272,7 @@ refreshed on every read. Payments: `CASH | BANK_TRANSFER | CARD | ONLINE | CHEQU
 
 ---
 
-## Data model (34 tables)
+## Data model (35 tables)
 
 ```
 User ─┬─ Student ──── Guardian / Enrollment / Attendance / ExamResult
@@ -241,5 +300,5 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 |---|---|---|
 | 2 ✅ | `/auth/*` (login, refresh, logout, me, change-password) · parent role |
 | 3 ✅ | `/students`, `/teachers`, `/attendance`, `/fees/*` |
-| 4 | `/exams`, `/results`, `/timetable`, `/notifications`, `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` |
+| 4 ◐ | `/exams`, `/results` ✅ · `/timetable` ✅ · `/notifications` ✅ · `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` pending |
 | 5 | `/dashboard/summary`, `/reports/*` |

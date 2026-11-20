@@ -25,6 +25,7 @@ import { attendanceRouter } from './attendance.routes.js'
 import { feesRouter } from './fees.routes.js'
 import { examsRouter } from './exams.routes.js'
 import { timetableRouter } from './timetable.routes.js'
+import { notificationsRouter } from './notifications.routes.js'
 
 apiRouter.use(authRouter)
 apiRouter.use(academicRouter)
@@ -34,3 +35,4 @@ apiRouter.use(attendanceRouter)
 apiRouter.use(feesRouter)
 apiRouter.use(examsRouter)
 apiRouter.use(timetableRouter)
+apiRouter.use(notificationsRouter)
