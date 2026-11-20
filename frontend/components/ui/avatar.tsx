@@ -28,7 +28,11 @@ function AvatarImage({
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
-      className={cn('aspect-square size-full', className)}
+      // Small decorative images: defer the download and let the browser decode
+      // off the main thread so they never delay first paint.
+      loading="lazy"
+      decoding="async"
+      className={cn('aspect-square size-full object-cover', className)}
       {...props}
     />
   )
