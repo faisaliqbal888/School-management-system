@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { apiFetch, ApiRequestError } from "@/lib/api-client"
+import { ApiRequestError } from "@/lib/api-client"
 
 export interface PaginationMeta {
   page: number

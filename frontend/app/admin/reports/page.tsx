@@ -12,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Download,
   Loader2,
-  BarChart3,
   Calendar,
   FileText,
   Users,

@@ -10,7 +10,7 @@ import { MobileNavTrigger } from "@/components/layout/mobile-nav"
 import { useUnreadCount } from "@/lib/hooks/use-notifications"
 
 export function AdminHeader() {
-  const { user, isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth()
   const { unread } = useUnreadCount()
 
   return (

@@ -55,7 +55,7 @@ export function StudentDetailModal({
   studentId,
   open,
   onOpenChange,
-  onUpdated,
+  onUpdated: _onUpdated,
 }: StudentDetailModalProps) {
   const { student, isLoading, error } = useStudent(open ? studentId : null)
   const [tab, setTab] = useState("overview")

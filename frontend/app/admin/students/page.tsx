@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { useAuth, useRequireRole } from "@/lib/auth-context"
+import { useRequireRole } from "@/lib/auth-context"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { StudentTable } from "@/components/students/student-table"
@@ -41,7 +41,6 @@ interface ClassRow {
 
 export default function AdminStudentsPage() {
   const { ready } = useRequireRole("ADMIN")
-  const { user } = useAuth()
 
   const [filters, setFilters] = useState<StudentFilterValues>({
     search: "",

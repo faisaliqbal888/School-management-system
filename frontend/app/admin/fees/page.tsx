@@ -44,7 +44,6 @@ import {
   type InvoiceStatus,
 } from "@/lib/hooks/use-fees"
 import { formatDate, formatPKR } from "@/lib/format"
-import { cn } from "@/lib/utils"
 
 const STATUS_OPTIONS: (InvoiceStatus | "all")[] = [
   "all",
