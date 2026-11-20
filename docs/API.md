@@ -381,3 +381,27 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 | 3 ✅ | `/students`, `/teachers`, `/attendance`, `/fees/*` |
 | 4 | `/exams`, `/results` ✅ · `/timetable` ✅ · `/notifications` ✅ · `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` pending |
 | 5 ✅ | `/dashboard/summary`, `/reports/*` incl. CSV export |
+
+---
+
+## Endpoint map (all modules)
+
+Every route below is served under `/api/v1` and shares the envelope
+`{ success, data, meta? }` / `{ success, error: { code, message, details? } }`.
+
+| Area | Endpoints |
+|---|---|
+| Health | `GET /health`, `GET /health/ready` |
+| Auth | `POST /auth/login`, `/auth/refresh`, `/auth/logout`, `GET /auth/me`, `PATCH /auth/me/password` |
+| Academics | `GET/POST /classes`, `/sections`, `/subjects`, `GET /academic-years` |
+| Students | `GET/POST /students`, `GET/PATCH/DELETE /students/:id`, `GET /students/:id/attendance`, `/students/:id/invoices` |
+| Teachers | `GET/POST /teachers`, `GET/PATCH/DELETE /teachers/:id`, `GET /teachers/options` |
+| Attendance | `POST /attendance/bulk`, `GET /attendance?classId&sectionId&date`, `GET /attendance/summary`, `GET /attendance/today` |
+| Fees | `GET /fees/structures`, `GET /fees/summary`, `POST /fees/generate`, `GET /fees/invoices`, `POST /fees/payments` |
+| Exams | `GET/POST /exams`, `GET/PATCH /exams/:id`, `POST /exams/:id/results`, `GET /exams/results`, `GET /results/transcript` |
+| Timetable | `GET/POST /timetable`, `DELETE /timetable/:id`, `GET /timetable/me`, `GET /timetable/options` |
+| Notifications | `GET/POST /notifications`, `GET /notifications/unread-count`, `/options`, `/stats`, `POST /notifications/read-all`, `PATCH /notifications/:id` |
+| Dashboards | `GET /dashboard/summary` (role-aware) |
+| Reports | `GET /reports/fees`, `/attendance`, `/performance`, `/enrolment`, `/export` |
+| Operations | `GET /library/overview`, `/library/books`, `/library/issues`, `POST /library/issues`, `PATCH /library/issues/:id/return`, `POST /library/refresh-overdue`, `GET /transport/overview`, `/transport/routes/:id/riders`, `GET /hostel/overview`, `GET /inventory/overview`, `GET /hr/payroll`, `/hr/leaves` |
+| Administration | `GET/POST /admin/users`, `PATCH /admin/users/:id/status`, `POST /admin/users/:id/reset-password`, `GET /admin/staff`, `GET/PATCH /admin/settings`, `GET /admin/alerts` |
