@@ -295,6 +295,30 @@ the same rows the UI renders. Teachers and learners receive `403`.
 
 ---
 
+## Operations — library, transport, hostel, inventory, HR
+
+Staff-only (`ADMIN` writes, `TEACHER` reads where noted). Learners and parents receive `403`.
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/library/overview` | ADMIN, TEACHER | Titles, copies, on-loan, overdue, per-category breakdown |
+| GET | `/library/books` | ADMIN, TEACHER | Paginated catalogue — `search` (title/author/ISBN), `category` |
+| GET | `/library/issues` | ADMIN, TEACHER | Loan ledger — `status` (`ISSUED`/`OVERDUE`/`RETURNED`), `search` |
+| POST | `/library/issues` | ADMIN | `{ bookId, studentId, dueDate }` — refuses when no copies remain |
+| PATCH | `/library/issues/:id/return` | ADMIN | `{ fine? }` — restores availability, rejects a second return |
+| POST | `/library/refresh-overdue` | ADMIN | Flags past-due `ISSUED` loans as `OVERDUE` → `{ updated }` |
+| GET | `/transport/overview` | ADMIN, TEACHER | Routes with assigned vehicle, riders, seats, monthly fees |
+| GET | `/transport/routes/:id/riders` | ADMIN, TEACHER | Students on a route with pick-up stop |
+| GET | `/hostel/overview` | ADMIN, TEACHER | Rooms by block, beds, occupancy, residents, monthly revenue |
+| GET | `/inventory/overview` | ADMIN, TEACHER | Stock register, valuation per item and category, low-stock flags |
+| GET | `/hr/payroll?period=` | ADMIN | Payslips for one period (defaults to newest) + totals/head-count |
+| GET | `/hr/leaves` | ADMIN | Latest 50 leave requests with status |
+
+Issuing a book decrements `availableCopies`; returning it increments the same column, so the
+catalogue stays consistent without a separate stock table.
+
+---
+
 ## Query parameters (list endpoints)
 
 | Param | Type | Default | Notes |
@@ -335,5 +359,5 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 |---|---|---|
 | 2 ✅ | `/auth/*` (login, refresh, logout, me, change-password) · parent role |
 | 3 ✅ | `/students`, `/teachers`, `/attendance`, `/fees/*` |
-| 4 ◐ | `/exams`, `/results` ✅ · `/timetable` ✅ · `/notifications` ✅ · `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` pending |
+| 4 | `/exams`, `/results` ✅ · `/timetable` ✅ · `/notifications` ✅ · `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` pending |
 | 5 ✅ | `/dashboard/summary`, `/reports/*` incl. CSV export |

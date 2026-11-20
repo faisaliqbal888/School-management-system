@@ -1,107 +1,136 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useStaff } from "../../../lib/hooks/useStaff"
-import { useAuth, useRequireRole } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
+import { useMemo, useState } from "react"
+import Link from "next/link"
 import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Loader2, Users, DollarSign, Calendar, TrendingUp, Plus, Download } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { CalendarDays, DollarSign, Loader2, Users, Wallet } from "lucide-react"
+import { useRequireRole } from "@/lib/auth-context"
+import { useStaff } from "@/lib/hooks/useStaff"
+import { money, useLeaveRequests, usePayroll } from "@/lib/hooks/use-operations"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
-const stats = [
-  { title: "Total Staff", value: "248", icon: Users, color: "bg-primary/10 text-primary" },
-  { title: "Monthly Payroll", value: "$124,500", icon: DollarSign, color: "bg-success/10 text-success" },
-  { title: "On Leave Today", value: "5", icon: Calendar, color: "bg-warning/10 text-warning" },
-  { title: "Attendance Rate", value: "94.2%", icon: TrendingUp, color: "bg-accent/10 text-accent" },
-]
+const payrollTone: Record<string, string> = {
+  PAID: "bg-emerald-100 text-emerald-700",
+  PENDING: "bg-amber-100 text-amber-700",
+  DRAFT: "bg-slate-200 text-slate-700",
+}
 
-// Staff will be fetched from the API via SWR hook
-// Payroll will be fetched from the payroll API route
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
 
-const leaveData = [
-  { id: 1, name: "Sara Ahmed", type: "Casual Leave", from: "Dec 10, 2024", to: "Dec 12, 2024", days: 3, status: "Approved" },
-  { id: 2, name: "Ali Hassan", type: "Medical Leave", from: "Dec 08, 2024", to: "Dec 08, 2024", days: 1, status: "Pending" },
-  { id: 3, name: "Hassan Khan", type: "Annual Leave", from: "Dec 20, 2024", to: "Dec 27, 2024", days: 8, status: "Approved" },
-  { id: 4, name: "Maryam Khan", type: "Casual Leave", from: "Dec 15, 2024", to: "Dec 16, 2024", days: 2, status: "Pending" },
-]
+/** Payroll CSV, built from the rows already on screen. */
+function downloadPayrollCsv(rows: { period: string; staffName: string; baseSalary: number; allowances: number; deductions: number; netPay: number; status: string }[]) {
+  if (rows.length === 0) return
+  const headers = ["Period", "Employee", "Base", "Allowances", "Deductions", "Net pay", "Status"]
+  const lines = rows.map((row) => [
+    row.period,
+    row.staffName,
+    row.baseSalary,
+    row.allowances,
+    row.deductions,
+    row.netPay,
+    row.status,
+  ])
+  const csv = [headers, ...lines]
+    .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+    .join("\n")
 
-export default function AdminHRPage() {
-  const { user, isLoading, isAuthenticated } = useAuth()
-  const [activeTab, setActiveTab] = useState("staff")
-  const { staff, isLoading: staffLoading } = useStaff()
-  const [payroll, setPayroll] = useState<any[]>([])
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = `payroll-${rows[0]?.period ?? "report"}.csv`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
 
-  useEffect(() => {
-    async function loadPayroll() {
-      try {
-        const res = await fetch('/api/admin/payroll')
-        if (res.ok) {
-          const data = await res.json()
-          setPayroll(data)
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-    loadPayroll()
-  }, [])
-
-  function downloadCSV(data: any[], filename = 'payroll.csv') {
-    if (!data || data.length === 0) return
-    const headers = ['Month', 'Base Salary', 'Allowances', 'Deductions', 'Total', 'Status']
-    const rows = data.map((p) => [p.month, p.base, p.allowances, p.deductions, p.total, p.status])
-    const csv = [headers, ...rows]
-      .map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
-      .join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  }
-
+export default function AdminHrPage() {
   const { ready } = useRequireRole("ADMIN")
+  const [period, setPeriod] = useState<string | undefined>(undefined)
 
-  if (!ready) return <FullPageLoader />
+  const { staff, isLoading: staffLoading } = useStaff()
+  const { payroll, isLoading: payrollLoading } = usePayroll(period)
+  const { leaves, isLoading: leavesLoading } = useLeaveRequests()
+
+  const stats = useMemo(
+    () => [
+      {
+        title: "Active staff",
+        value: payroll ? payroll.headcount.staff + payroll.headcount.teachers : "—",
+        hint: payroll ? `${payroll.headcount.teachers} teachers · ${payroll.headcount.staff} admin` : undefined,
+        icon: Users,
+        color: "bg-primary/10 text-primary",
+      },
+      {
+        title: "Payroll (net)",
+        value: payroll ? `PKR ${money(payroll.totals.net)}` : "—",
+        hint: payroll?.period ? `period ${payroll.period}` : undefined,
+        icon: DollarSign,
+        color: "bg-success/10 text-success",
+      },
+      {
+        title: "Pending leave",
+        value: payroll?.pendingLeaves ?? 0,
+        hint: "awaiting approval",
+        icon: CalendarDays,
+        color: "bg-warning/10 text-warning",
+      },
+      {
+        title: "Draft payslips",
+        value: payroll?.totals.draft ?? 0,
+        hint: `${payroll?.totals.headcount ?? 0} payslips in this run`,
+        icon: Wallet,
+        color: "bg-accent/10 text-accent",
+      },
+    ],
+    [payroll],
+  )
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <AdminSidebar />
-      <div className="lg:pl-64 transition-all duration-300">
+      <div className="transition-all duration-300 lg:pl-64">
         <AdminHeader />
-        <main className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
+        <main className="space-y-6 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-2xl font-bold">HR & Payroll</h1>
-              <p className="text-muted-foreground">Manage HR and payroll operations</p>
+              <h1 className="text-2xl font-bold">HR &amp; Payroll</h1>
+              <p className="text-muted-foreground">Staff directory, monthly payroll runs and leave requests</p>
             </div>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Staff Member
+            <Button asChild>
+              <Link href="/admin/teachers">Manage staff</Link>
             </Button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {stats.map((stat) => (
               <Card key={stat.title} className="border-0 shadow-sm">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}`}>
-                      <stat.icon className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold">{stat.value}</p>
-                      <p className="text-sm text-muted-foreground">{stat.title}</p>
-                    </div>
+                <CardContent className="flex items-center gap-4 p-4">
+                  <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", stat.color)}>
+                    <stat.icon className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-2xl font-bold">{stat.value}</p>
+                    <p className="truncate text-sm text-muted-foreground">{stat.title}</p>
+                    {stat.hint && <p className="truncate text-[11px] text-muted-foreground">{stat.hint}</p>}
                   </div>
                 </CardContent>
               </Card>
@@ -109,152 +138,196 @@ export default function AdminHRPage() {
           </div>
 
           <Card className="border-0 shadow-sm">
-            <CardHeader>
-              <CardTitle>HR Management</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle>HR management</CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <Tabs defaultValue="payroll" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="staff">Staff Directory</TabsTrigger>
                   <TabsTrigger value="payroll">Payroll</TabsTrigger>
-                  <TabsTrigger value="leave">Leave Requests</TabsTrigger>
+                  <TabsTrigger value="staff">Staff directory</TabsTrigger>
+                  <TabsTrigger value="leave">Leave requests</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="staff" className="space-y-4 mt-4">
+                {/* ── Payroll ─────────────────────────────── */}
+                <TabsContent value="payroll" className="mt-4 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label htmlFor="payroll-period" className="text-sm text-muted-foreground">
+                      Period
+                    </label>
+                    <select
+                      id="payroll-period"
+                      className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm"
+                      value={payroll?.period ?? ""}
+                      onChange={(event) => setPeriod(event.target.value || undefined)}
+                    >
+                      {(payroll?.periods ?? []).map((entry) => (
+                        <option key={entry} value={entry}>
+                          {entry}
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        downloadPayrollCsv(payroll?.rows ?? [])
+                        toast.success("Payroll CSV downloaded")
+                      }}
+                      disabled={(payroll?.rows.length ?? 0) === 0}
+                    >
+                      Download CSV
+                    </Button>
+                  </div>
+
+                  {payrollLoading ? (
+                    <Skeleton className="h-40 w-full" />
+                  ) : (payroll?.rows.length ?? 0) === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      No payroll has been generated for this period.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[720px] text-sm">
+                        <thead className="border-b bg-muted/50">
+                          <tr>
+                            <th className="px-3 py-2 text-left font-semibold">Employee</th>
+                            <th className="px-3 py-2 text-left font-semibold">Department</th>
+                            <th className="px-3 py-2 text-right font-semibold">Base</th>
+                            <th className="px-3 py-2 text-right font-semibold">Allowances</th>
+                            <th className="px-3 py-2 text-right font-semibold">Deductions</th>
+                            <th className="px-3 py-2 text-right font-semibold">Net</th>
+                            <th className="px-3 py-2 text-left font-semibold">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {payroll?.rows.map((row) => (
+                            <tr key={row.id} className="border-b last:border-0">
+                              <td className="px-3 py-2">
+                                <p className="font-medium">{row.staffName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {row.employeeNo ?? "—"} · {row.staffType}
+                                </p>
+                              </td>
+                              <td className="px-3 py-2 text-muted-foreground">{row.department ?? "—"}</td>
+                              <td className="px-3 py-2 text-right">{money(row.baseSalary)}</td>
+                              <td className="px-3 py-2 text-right text-emerald-600">{money(row.allowances)}</td>
+                              <td className="px-3 py-2 text-right text-rose-600">{money(row.deductions)}</td>
+                              <td className="px-3 py-2 text-right font-semibold">{money(row.netPay)}</td>
+                              <td className="px-3 py-2">
+                                <Badge className={payrollTone[row.status] ?? "bg-muted"}>
+                                  {row.status.toLowerCase()}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Staff ───────────────────────────────── */}
+                <TabsContent value="staff" className="mt-4">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="border-b bg-muted/50">
                         <tr>
-                          <th className="text-left py-3 px-4 font-semibold">Name</th>
-                          <th className="text-left py-3 px-4 font-semibold">Position</th>
-                          <th className="text-left py-3 px-4 font-semibold">Department</th>
-                          <th className="text-left py-3 px-4 font-semibold">Salary</th>
-                          <th className="text-left py-3 px-4 font-semibold">Status</th>
+                          <th className="px-3 py-2 text-left font-semibold">Name</th>
+                          <th className="px-3 py-2 text-left font-semibold">Position</th>
+                          <th className="px-3 py-2 text-left font-semibold">Department</th>
+                          <th className="px-3 py-2 text-left font-semibold">Status</th>
                         </tr>
                       </thead>
                       <tbody>
                         {staffLoading ? (
                           <tr>
-                            <td colSpan={5} className="p-6 text-center">Loading staff…</td>
+                            <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                              Loading staff…
+                            </td>
                           </tr>
-                        ) : (
-                          staff.map((s: any) => (
-                            <tr key={s.id} className="border-b hover:bg-muted/50 transition-colors">
-                              <td className="py-3 px-4">
-                                <div className="flex items-center gap-3">
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarFallback className="bg-primary text-primary-foreground text-xs font-bold">
-                                      {s.name?.split(" ").map((n: string) => n[0]).join("")}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <p className="font-medium">{s.name}</p>
-                                    <p className="text-xs text-muted-foreground">{s.email}</p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3 px-4">{s.position || s.role}</td>
-                              <td className="py-3 px-4">{s.department}</td>
-                              <td className="py-3 px-4 font-medium">{s.salary || s.salaryFormatted || '-'}</td>
-                              <td className="py-3 px-4">
-                                <Badge className={s.status === "Active" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
-                                  {s.status || 'Active'}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="payroll" className="space-y-4 mt-4">
-                  <Button className="mb-4" onClick={() => downloadCSV(payroll)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Download Payroll Report
-                  </Button>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="border-b bg-muted/50">
-                        <tr>
-                          <th className="text-left py-3 px-4 font-semibold">Month</th>
-                          <th className="text-left py-3 px-4 font-semibold">Base Salary</th>
-                          <th className="text-left py-3 px-4 font-semibold">Allowances</th>
-                          <th className="text-left py-3 px-4 font-semibold">Deductions</th>
-                          <th className="text-left py-3 px-4 font-semibold">Total</th>
-                          <th className="text-left py-3 px-4 font-semibold">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {payroll.length === 0 ? (
+                        ) : (staff ?? []).length === 0 ? (
                           <tr>
-                            <td colSpan={6} className="p-6 text-center">No payroll data available</td>
+                            <td colSpan={4} className="p-6 text-center text-muted-foreground">
+                              No staff records found.
+                            </td>
                           </tr>
                         ) : (
-                          payroll.map((p, idx) => (
-                            <tr key={idx} className="border-b hover:bg-muted/50 transition-colors">
-                              <td className="py-3 px-4 font-medium">{p.month}</td>
-                              <td className="py-3 px-4">{p.base}</td>
-                              <td className="py-3 px-4 text-green-600">{p.allowances}</td>
-                              <td className="py-3 px-4 text-red-600">{p.deductions}</td>
-                              <td className="py-3 px-4 font-bold">{p.total}</td>
-                              <td className="py-3 px-4">
-                                <Badge className={p.status === "Paid" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"}>
-                                  {p.status}
-                                </Badge>
-                              </td>
-                            </tr>
-                          ))
+                          (staff ?? []).map((member: Record<string, unknown>) => {
+                            const record = member as {
+                              id: string
+                              name?: string
+                              email?: string
+                              position?: string
+                              role?: string
+                              department?: string
+                              status?: string
+                            }
+                            return (
+                              <tr key={record.id} className="border-b transition-colors hover:bg-muted/50">
+                                <td className="px-3 py-2">
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
+                                        {(record.name ?? "S")
+                                          .split(" ")
+                                          .map((part) => part[0])
+                                          .join("")}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="font-medium">{record.name ?? "—"}</p>
+                                      <p className="text-xs text-muted-foreground">{record.email ?? "—"}</p>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2">{record.position ?? record.role ?? "—"}</td>
+                                <td className="px-3 py-2 text-muted-foreground">{record.department ?? "—"}</td>
+                                <td className="px-3 py-2">
+                                  <Badge variant="secondary">{record.status ?? "Active"}</Badge>
+                                </td>
+                              </tr>
+                            )
+                          })
                         )}
                       </tbody>
                     </table>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="leave" className="space-y-4 mt-4">
-                  <Button className="mb-4">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Process Leave Request
-                  </Button>
-                  <div className="space-y-3">
-                    {leaveData.map((request) => (
-                      <div key={request.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                        <div className="flex-1">
+                {/* ── Leave ───────────────────────────────── */}
+                <TabsContent value="leave" className="mt-4 space-y-3">
+                  {leavesLoading ? (
+                    <Skeleton className="h-24 w-full" />
+                  ) : leaves.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      No leave requests have been filed.
+                    </p>
+                  ) : (
+                    leaves.map((request) => (
+                      <div
+                        key={request.id}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
+                      >
+                        <div className="min-w-0">
                           <p className="font-medium">{request.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {request.type} - {request.days} days
-                          </p>
+                          <p className="truncate text-sm text-muted-foreground">{request.reason}</p>
                           <p className="text-xs text-muted-foreground">
-                            {request.from} to {request.to}
+                            {shortDate(request.fromDate)} → {shortDate(request.toDate)}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Badge className={request.status === "Approved" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
-                            {request.status}
-                          </Badge>
-                          <Button variant="outline" size="sm">
-                            Manage
-                          </Button>
-                        </div>
+                        <Badge variant={request.status === "PENDING" ? "outline" : "secondary"}>
+                          {request.status.toLowerCase()}
+                        </Badge>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  )}
                 </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
         </main>
       </div>
-    </div>
-  )
-}
-
-/** Shared loading fallback while the session is being verified. */
-function FullPageLoader() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

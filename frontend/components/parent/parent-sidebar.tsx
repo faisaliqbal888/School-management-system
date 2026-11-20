@@ -22,6 +22,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
+import {
+  MobileNavDrawer,
+  MobileNavLinks,
+  useMobileNav,
+} from "@/components/layout/mobile-nav"
 
 const navigation = [
   { name: "Dashboard", href: "/parent/dashboard", icon: LayoutDashboard },
@@ -38,11 +43,33 @@ export function ParentSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const { user, logout } = useAuth()
+  const mobileNav = useMobileNav()
 
   return (
+    <>
+      <MobileNavDrawer
+        open={mobileNav.open}
+        onClose={mobileNav.close}
+        className="bg-gradient-to-b from-rose-600 to-pink-700"
+        title={SCHOOL.shortName}
+        subtitle="Parent Portal"
+      >
+        <MobileNavLinks items={navigation} onNavigate={mobileNav.close} />
+        <MobileNavLinks items={bottomNavigation} onNavigate={mobileNav.close} />
+        <div className="border-t border-white/20 px-3 py-4">
+          <Button
+            variant="ghost"
+            onClick={() => void logout()}
+            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            <LogOut className="h-5 w-5" /> Sign out
+          </Button>
+        </div>
+      </MobileNavDrawer>
+
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col bg-gradient-to-b from-rose-600 to-pink-700 text-white transition-all duration-300",
+        "fixed left-0 top-0 z-40 hidden h-screen flex-col lg:flex bg-gradient-to-b from-rose-600 to-pink-700 text-white transition-all duration-300",
         collapsed ? "w-[72px]" : "w-64",
       )}
     >
@@ -143,5 +170,6 @@ export function ParentSidebar() {
         </Button>
       </div>
     </aside>
+    </>
   )
 }

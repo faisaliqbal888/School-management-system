@@ -124,7 +124,7 @@ export default function TeacherMessagesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50/30">
       <TeacherSidebar />
-      <div className="pl-64">
+      <div className="transition-all duration-300 lg:pl-64">
         <TeacherHeader />
         <main className="p-6">
           <div className="mb-6">

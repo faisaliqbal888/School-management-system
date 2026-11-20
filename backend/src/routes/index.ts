@@ -28,6 +28,7 @@ import { timetableRouter } from './timetable.routes.js'
 import { notificationsRouter } from './notifications.routes.js'
 import { dashboardRouter } from './dashboard.routes.js'
 import { reportsRouter } from './reports.routes.js'
+import { operationsRouter } from './operations.routes.js'
 
 apiRouter.use(authRouter)
 apiRouter.use(academicRouter)
@@ -40,3 +41,4 @@ apiRouter.use(timetableRouter)
 apiRouter.use(notificationsRouter)
 apiRouter.use(dashboardRouter)
 apiRouter.use(reportsRouter)
+apiRouter.use(operationsRouter)

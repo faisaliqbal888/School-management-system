@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
+import { MobileNavTrigger } from "@/components/layout/mobile-nav"
 import { useUnreadCount } from "@/lib/hooks/use-notifications"
 
 export function StudentHeader() {
@@ -14,7 +15,8 @@ export function StudentHeader() {
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 backdrop-blur-sm px-6">
-      <div className="flex items-center gap-4 flex-1">
+      <div className="flex flex-1 items-center gap-2">
+        <MobileNavTrigger />
         <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input

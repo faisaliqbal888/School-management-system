@@ -33,6 +33,11 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import {
+  MobileNavDrawer,
+  MobileNavLinks,
+  useMobileNav,
+} from "@/components/layout/mobile-nav"
 
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
@@ -61,12 +66,34 @@ export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const { user, logout } = useAuth()
+  const mobileNav = useMobileNav()
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <>
+      <MobileNavDrawer
+        open={mobileNav.open}
+        onClose={mobileNav.close}
+        className="bg-gradient-to-b from-violet-600 to-purple-700"
+        title={SCHOOL.shortName}
+        subtitle="Admin Portal"
+      >
+        <MobileNavLinks items={navigation} onNavigate={mobileNav.close} label="Management" />
+        <MobileNavLinks items={bottomNavigation} onNavigate={mobileNav.close} />
+        <div className="border-t border-white/20 px-3 py-4">
+          <Button
+            variant="ghost"
+            onClick={() => void logout()}
+            className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            <LogOut className="h-5 w-5" /> Sign out
+          </Button>
+        </div>
+      </MobileNavDrawer>
+
+      <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 flex h-screen flex-col bg-gradient-to-b from-violet-600 to-purple-700 text-white transition-all duration-300",
+          "fixed left-0 top-0 z-40 hidden h-screen flex-col bg-gradient-to-b from-violet-600 to-purple-700 text-white transition-all duration-300 lg:flex",
           collapsed ? "w-[72px]" : "w-64",
         )}
       >
@@ -186,6 +213,7 @@ export function AdminSidebar() {
           {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
         </Button>
       </aside>
-    </TooltipProvider>
+      </TooltipProvider>
+    </>
   )
 }

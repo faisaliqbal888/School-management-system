@@ -4,9 +4,10 @@ A modern **School Management System (SMS)** that digitises school operations —
 attendance, exams, fees, timetable, library, transport, hostel, inventory and payroll — in one
 role-based portal.
 
-> **Status:** Phases 0–5 complete — backend + UI live for auth, academics, students, teachers,
-> attendance, fees, exams/results, timetable, notifications, dashboards and reports with CSV
-> export · 119 backend tests green · frontend builds clean (all routes prerender).
+> **Status:** Phases 0–6 complete — backend + UI live for auth, academics, students, teachers,
+> attendance, fees, exams/results, timetable, notifications, dashboards, reports with CSV export,
+> library, transport, hostel, inventory and HR/payroll · 130 backend tests green · responsive
+> layout with a mobile navigation drawer on every role · frontend builds clean.
 > See [`docs/PLAN.md`](docs/PLAN.md) for the full review and roadmap.
 
 ---
@@ -132,7 +133,7 @@ CI runs typecheck + build for the frontend and typecheck + tests for the backend
 | 3 | Students, teachers, attendance, fees — full CRUD + frontend wiring | ✅ |
 | 4 | Exams, timetable, notifications — full backend + UI | ✅ |
 | 5 | Live dashboards, reports, CSV exports | ✅ |
-| 6 | Mobile drawer, loading states, image optimisation, remaining demo pages | ◐ |
+| 6 | Mobile drawer, loading states, operations pages (library/transport/hostel/inventory/HR) | ✅ |
 | 7 | Tests, security pass, deployment | 🔜 |
 
 Full detail: [`docs/PLAN.md`](docs/PLAN.md)
