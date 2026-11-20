@@ -218,15 +218,16 @@ describe('exams: marks entry', () => {
       .get(`/api/v1/exams/${examId}/marks`)
       .set('Authorization', `Bearer ${teacherToken}`)
 
-    const byId = new Map(
+    const byId = new Map<string, { studentId: string; marksObtained: number; grade: string }>(
       roster.body.data.entries.map((e: { studentId: string; marksObtained: number; grade: string }) => [
         e.studentId,
         e,
       ]),
     )
     // 45/50 = 90% → A+
-    expect(byId.get(studentIds[0])!.marksObtained).toBe(45)
-    expect(byId.get(studentIds[0])!.grade).toBe('A+')
+    const first = byId.get(studentIds[0]!)
+    expect(first?.marksObtained).toBe(45)
+    expect(first?.grade).toBe('A+')
   })
 
   it('replaces marks on re-save (upsert)', async () => {
@@ -241,9 +242,11 @@ describe('exams: marks entry', () => {
     const roster = await request(app)
       .get(`/api/v1/exams/${examId}/marks`)
       .set('Authorization', `Bearer ${teacherToken}`)
-    const entry = roster.body.data.entries.find((e: { studentId: string }) => e.studentId === studentIds[0])
-    expect(entry.marksObtained).toBe(20)
-    expect(entry.grade).toBe('E') // 40% → E
+    const entry = roster.body.data.entries.find(
+      (e: { studentId: string; marksObtained: number; grade: string }) => e.studentId === studentIds[0],
+    )
+    expect(entry?.marksObtained).toBe(20)
+    expect(entry?.grade).toBe('E') // 40% → E
   })
 
   it('rejects marks above the total', async () => {

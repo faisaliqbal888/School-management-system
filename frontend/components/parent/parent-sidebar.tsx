@@ -16,6 +16,7 @@ import {
   School,
   ChevronLeft,
   ChevronRight,
+  Calendar,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,7 @@ const navigation = [
   { name: "My Children", href: "/parent/children", icon: Users },
   { name: "Attendance", href: "/parent/attendance", icon: ClipboardCheck },
   { name: "Results", href: "/parent/results", icon: FileText },
+  { name: "Timetable", href: "/parent/timetable", icon: Calendar },
   { name: "Fees", href: "/parent/fees", icon: CreditCard },
 ]
 
