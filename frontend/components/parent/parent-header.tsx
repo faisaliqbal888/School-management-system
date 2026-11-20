@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
+import { useUnreadCount } from "@/lib/hooks/use-notifications"
 
 export function ParentHeader() {
-  const { user } = useAuth()
+  const { user, isAuthenticated } = useAuth()
+  const { unread } = useUnreadCount()
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 px-6 backdrop-blur-sm">
@@ -25,11 +28,15 @@ export function ParentHeader() {
           <span className="text-sm font-semibold text-rose-600">Parent</span>
         </div>
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <Badge className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center bg-red-500 p-0 text-[10px]">
-            3
-          </Badge>
+        <Button variant="ghost" size="icon" className="relative" asChild>
+          <Link href="/parent/notifications" aria-label="Notifications">
+            <Bell className="h-5 w-5" />
+            {isAuthenticated && unread > 0 && (
+              <Badge className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center bg-red-500 px-1 text-[10px]">
+                {unread > 99 ? "99+" : unread}
+              </Badge>
+            )}
+          </Link>
         </Button>
 
         <Avatar className="h-9 w-9">
