@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "School Management System — REST API (Express + TypeScript + Prisma)",
+  "description": "School Management System \u2014 REST API (Express + TypeScript + Prisma)",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -21,9 +21,11 @@
     "migrate:status": "prisma migrate status",
     "migrate:diff": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script",
     "db:push": "prisma db push",
-    "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "db:seed:demo": "tsx prisma/seed.ts",
+    "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "6.19.3",

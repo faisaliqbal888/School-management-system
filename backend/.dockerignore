@@ -1,0 +1,8 @@
+node_modules
+dist
+tests
+coverage
+*.md
+.env
+.env.*
+!.env.example

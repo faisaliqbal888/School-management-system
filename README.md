@@ -37,6 +37,8 @@ School-management-system/
 ├── backend/                  # Express + TypeScript API  (Phase 1)
 ├── docs/
 │   ├── PLAN.md               # review + roadmap (read this first)
+│   ├── API.md                # every endpoint + conventions
+│   ├── DEPLOYMENT.md         # Vercel + Railway/Docker runbook
 │   └── DECISIONS.md          # locked-in conventions
 ├── .github/workflows/ci.yml  # typecheck + build on every PR
 └── package.json              # npm workspaces root

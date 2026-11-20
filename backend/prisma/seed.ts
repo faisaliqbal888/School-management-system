@@ -46,6 +46,19 @@ const TEACHER_DEPARTMENTS = ['Mathematics', 'Science', 'English', 'Urdu', 'Compu
 // ─────────────────────────────────────────────────────────────
 
 async function main() {
+  // This script WIPES every table and replaces it with fixtures whose passwords
+  // are publicly documented. Refuse to run against a production database unless
+  // the operator explicitly asks for it.
+  if (process.env['NODE_ENV'] === 'production' && process.env['ALLOW_PROD_SEED'] !== 'true') {
+    console.error(
+      '✗ Refusing to seed a production database.\n' +
+        '  The demo seed deletes all data and creates accounts with a known password.\n' +
+        '  Use `npm run admin:create` for the first real administrator, or set\n' +
+        '  ALLOW_PROD_SEED=true if you really mean to wipe this database.',
+    )
+    process.exit(1)
+  }
+
   console.log('🌱 Seeding database…\n')
 
   // Wipe in FK-safe order (children first).
