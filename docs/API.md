@@ -329,6 +329,7 @@ catalogue stays consistent without a separate stock table.
 | POST | `/admin/users` | `{ name, email, password, role, phone? }` — 400 on a duplicate email |
 | PATCH | `/admin/users/:id/status` | `{ status: ACTIVE \| INACTIVE \| SUSPENDED }` — self-change is refused |
 | POST | `/admin/users/:id/reset-password` | Issues a one-time password, revokes refresh tokens |
+| GET | `/admin/staff` | Admin-office staff directory (teaching staff live on `/teachers`) |
 | GET | `/admin/settings` | Ten known keys, each with `source: database \| default` |
 | PATCH | `/admin/settings` | `{ updates: [{ key, value }] }` — unknown keys reject the whole batch |
 | GET | `/admin/alerts` | Alerts derived on read from fees, attendance, library, inventory, HR |

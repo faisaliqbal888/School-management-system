@@ -125,6 +125,26 @@ export function useAlerts() {
   }
 }
 
+export interface StaffRow {
+  id: string
+  employeeNo: string
+  name: string
+  position: string
+  department: string
+  email: string | null
+  phone: string | null
+  employmentType: string
+  baseSalary: number
+  status: string
+  joiningDate: string
+}
+
+/** Admin-office staff only — teachers come from `useTeachers`. */
+export function useStaffDirectory() {
+  const query = useApiQuery<StaffRow[]>("/admin/staff")
+  return { staff: query.data ?? [], isLoading: query.isLoading, error: query.error, refetch: query.refetch }
+}
+
 export function useSettings() {
   const query = useApiQuery<{ key: string; value: string; source: "database" | "default"; updatedAt: string | null }[]>(
     "/admin/settings",

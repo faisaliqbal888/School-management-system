@@ -27,6 +27,9 @@ export interface Actor {
   role: Role
 }
 
+const money = (value: Prisma.Decimal | number | string | null | undefined): number =>
+  value === null || value === undefined ? 0 : Math.round(Number(value.toString()) * 100) / 100
+
 function requireAdmin(actor: Actor) {
   if (actor.role !== 'ADMIN') throw forbidden('Only administrators can manage this resource')
 }
@@ -179,6 +182,46 @@ export async function resetPassword(actor: Actor, userId: string) {
   await audit(actor.id, 'user.reset-password', 'User', userId)
 
   return { userId, name: target.name, password }
+}
+
+// ═════════════════════════════════════════════════════════════
+//  STAFF DIRECTORY
+// ═════════════════════════════════════════════════════════════
+
+/** Admin-office staff (non-teaching). Teachers live on `/teachers`. */
+export async function listStaffDirectory(actor: Actor) {
+  requireAdmin(actor)
+
+  const rows = await prisma.staff.findMany({
+    orderBy: [{ status: 'asc' }, { name: 'asc' }],
+    select: {
+      id: true,
+      employeeNo: true,
+      name: true,
+      designation: true,
+      department: true,
+      email: true,
+      phone: true,
+      employmentType: true,
+      baseSalary: true,
+      status: true,
+      joiningDate: true,
+    },
+  })
+
+  return rows.map((row) => ({
+    id: row.id,
+    employeeNo: row.employeeNo,
+    name: row.name,
+    position: row.designation,
+    department: row.department,
+    email: row.email,
+    phone: row.phone,
+    employmentType: row.employmentType,
+    baseSalary: money(row.baseSalary),
+    status: row.status,
+    joiningDate: row.joiningDate.toISOString(),
+  }))
 }
 
 // ═════════════════════════════════════════════════════════════

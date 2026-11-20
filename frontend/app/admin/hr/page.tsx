@@ -12,8 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { CalendarDays, DollarSign, Loader2, Users, Wallet } from "lucide-react"
 import { useRequireRole } from "@/lib/auth-context"
-import { useStaff } from "@/lib/hooks/useStaff"
+import { useTeachers } from "@/lib/hooks/use-teachers"
 import { money, useLeaveRequests, usePayroll } from "@/lib/hooks/use-operations"
+import { useStaffDirectory } from "@/lib/hooks/use-admin"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -58,7 +59,34 @@ export default function AdminHrPage() {
   const { ready } = useRequireRole("ADMIN")
   const [period, setPeriod] = useState<string | undefined>(undefined)
 
-  const { staff, isLoading: staffLoading } = useStaff()
+  const { staff: officeStaff, isLoading: staffLoading } = useStaffDirectory()
+  const { teachers, isLoading: teachersLoading } = useTeachers({ limit: 100 } as never)
+
+  /** One table for the whole payroll population: teaching + admin staff. */
+  const directory = useMemo(
+    () => [
+      ...(teachers ?? []).map((teacher) => ({
+        id: teacher.id,
+        name: teacher.name,
+        email: teacher.email,
+        position: teacher.designation,
+        department: teacher.department,
+        kind: "Teacher" as const,
+        status: teacher.status,
+      })),
+      ...officeStaff.map((member) => ({
+        id: member.id,
+        name: member.name,
+        email: member.email ?? "—",
+        position: member.position,
+        department: member.department,
+        kind: "Staff" as const,
+        status: member.status,
+      })),
+    ],
+    [teachers, officeStaff],
+  )
+  const directoryLoading = staffLoading || teachersLoading
   const { payroll, isLoading: payrollLoading } = usePayroll(period)
   const { leaves, isLoading: leavesLoading } = useLeaveRequests()
 
@@ -240,51 +268,45 @@ export default function AdminHrPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {staffLoading ? (
+                        {directoryLoading ? (
                           <tr>
                             <td colSpan={4} className="p-6 text-center text-muted-foreground">
                               Loading staff…
                             </td>
                           </tr>
-                        ) : (staff ?? []).length === 0 ? (
+                        ) : directory.length === 0 ? (
                           <tr>
                             <td colSpan={4} className="p-6 text-center text-muted-foreground">
                               No staff records found.
                             </td>
                           </tr>
                         ) : (
-                          (staff ?? []).map((member: Record<string, unknown>) => {
-                            const record = member as {
-                              id: string
-                              name?: string
-                              email?: string
-                              position?: string
-                              role?: string
-                              department?: string
-                              status?: string
-                            }
+                          directory.map((record) => {
                             return (
                               <tr key={record.id} className="border-b transition-colors hover:bg-muted/50">
                                 <td className="px-3 py-2">
                                   <div className="flex items-center gap-3">
                                     <Avatar className="h-8 w-8">
                                       <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">
-                                        {(record.name ?? "S")
+                                        {record.name
                                           .split(" ")
                                           .map((part) => part[0])
                                           .join("")}
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <p className="font-medium">{record.name ?? "—"}</p>
-                                      <p className="text-xs text-muted-foreground">{record.email ?? "—"}</p>
+                                      <p className="font-medium">{record.name}</p>
+                                      <p className="text-xs text-muted-foreground">{record.email}</p>
                                     </div>
                                   </div>
                                 </td>
-                                <td className="px-3 py-2">{record.position ?? record.role ?? "—"}</td>
-                                <td className="px-3 py-2 text-muted-foreground">{record.department ?? "—"}</td>
                                 <td className="px-3 py-2">
-                                  <Badge variant="secondary">{record.status ?? "Active"}</Badge>
+                                  <p>{record.position}</p>
+                                  <p className="text-xs text-muted-foreground">{record.kind}</p>
+                                </td>
+                                <td className="px-3 py-2 text-muted-foreground">{record.department}</td>
+                                <td className="px-3 py-2">
+                                  <Badge variant="secondary">{record.status.toLowerCase()}</Badge>
                                 </td>
                               </tr>
                             )

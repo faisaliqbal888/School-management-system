@@ -81,6 +81,16 @@ adminRouter.post(
   }),
 )
 
+// ── Staff ────────────────────────────────────────────────────
+adminRouter.get(
+  '/admin/staff',
+  authenticate,
+  authorize('ADMIN'),
+  asyncHandler(async (req, res) => {
+    ok(res, await admin.listStaffDirectory(actorOf(req)))
+  }),
+)
+
 // ── Alerts ───────────────────────────────────────────────────
 adminRouter.get(
   '/admin/alerts',
