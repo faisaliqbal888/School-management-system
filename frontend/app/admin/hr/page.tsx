@@ -60,7 +60,7 @@ export default function AdminHrPage() {
   const [period, setPeriod] = useState<string | undefined>(undefined)
 
   const { staff: officeStaff, isLoading: staffLoading } = useStaffDirectory()
-  const { teachers, isLoading: teachersLoading } = useTeachers({ limit: 100 } as never)
+  const { teachers, isLoading: teachersLoading } = useTeachers({ limit: 100 })
 
   /** One table for the whole payroll population: teaching + admin staff. */
   const directory = useMemo(
