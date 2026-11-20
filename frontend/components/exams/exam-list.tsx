@@ -1,189 +1,226 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
-import { Calendar, Users, FileText, ChevronRight, Edit, Eye } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  BarChart3,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardList,
+  Eye,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Upload,
+  Users,
+} from "lucide-react"
+import { formatDate } from "@/lib/format"
+import { EXAM_STATUS_LABEL, EXAM_TYPE_LABEL, type ExamRow, type ExamStatus } from "@/lib/hooks/use-exams"
 import { cn } from "@/lib/utils"
 
-export interface Exam {
-  id: string
-  name: string
-  type: "Mid-Term" | "Final" | "Unit Test" | "Quiz"
-  startDate: string
-  endDate: string
-  classes: string[]
-  totalStudents: number
-  resultsPublished: boolean
-  progress: number
-  status: "Upcoming" | "In Progress" | "Completed"
+const STATUS_STYLES: Record<ExamStatus, string> = {
+  SCHEDULED: "bg-blue-50 text-blue-700 border-blue-200",
+  ONGOING: "bg-amber-50 text-amber-700 border-amber-200",
+  COMPLETED: "bg-slate-100 text-slate-700 border-slate-200",
+  PUBLISHED: "bg-emerald-50 text-emerald-700 border-emerald-200",
 }
-
-const exams: Exam[] = [
-  {
-    id: "1",
-    name: "Mid-Term Examination 2025",
-    type: "Mid-Term",
-    startDate: "2025-12-15",
-    endDate: "2025-12-20",
-    classes: ["6", "7", "8", "9", "10"],
-    totalStudents: 2847,
-    resultsPublished: false,
-    progress: 0,
-    status: "Upcoming",
-  },
-  {
-    id: "2",
-    name: "Unit Test - November",
-    type: "Unit Test",
-    startDate: "2025-11-25",
-    endDate: "2025-11-27",
-    classes: ["8", "9", "10"],
-    totalStudents: 1420,
-    resultsPublished: true,
-    progress: 100,
-    status: "Completed",
-  },
-  {
-    id: "3",
-    name: "Science Quiz",
-    type: "Quiz",
-    startDate: "2025-12-05",
-    endDate: "2025-12-05",
-    classes: ["9", "10"],
-    totalStudents: 890,
-    resultsPublished: true,
-    progress: 100,
-    status: "Completed",
-  },
-  {
-    id: "4",
-    name: "Mathematics Assessment",
-    type: "Unit Test",
-    startDate: "2025-12-10",
-    endDate: "2025-12-10",
-    classes: ["7", "8"],
-    totalStudents: 720,
-    resultsPublished: false,
-    progress: 65,
-    status: "In Progress",
-  },
-]
 
 interface ExamListProps {
-  onViewExam?: (exam: Exam) => void
-  onEditExam?: (exam: Exam) => void
+  exams: ExamRow[]
+  isLoading?: boolean
+  error?: string | null
+  /** Admin/teacher actions */
+  canManage?: boolean
+  onEnterMarks?: (exam: ExamRow) => void
+  onAnalyse?: (exam: ExamRow) => void
+  onPublish?: (exam: ExamRow) => void
+  onDelete?: (exam: ExamRow) => void
+  /** Student/parent */
+  onViewResult?: (exam: ExamRow) => void
 }
 
-export function ExamList({ onViewExam, onEditExam }: ExamListProps) {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Completed":
-        return "bg-success/10 text-success hover:bg-success/20"
-      case "In Progress":
-        return "bg-primary/10 text-primary hover:bg-primary/20"
-      case "Upcoming":
-        return "bg-warning/10 text-warning hover:bg-warning/20"
-      default:
-        return "bg-muted text-muted-foreground"
-    }
+export function ExamList({
+  exams,
+  isLoading = false,
+  error = null,
+  canManage = false,
+  onEnterMarks,
+  onAnalyse,
+  onPublish,
+  onDelete,
+  onViewResult,
+}: ExamListProps) {
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4">
+              <Skeleton className="h-9 w-9 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-6 w-20" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    )
   }
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "Mid-Term":
-        return "bg-chart-4/10 text-chart-4"
-      case "Final":
-        return "bg-destructive/10 text-destructive"
-      case "Unit Test":
-        return "bg-chart-5/10 text-chart-5"
-      case "Quiz":
-        return "bg-accent/10 text-accent"
-      default:
-        return "bg-muted text-muted-foreground"
-    }
+  if (error) {
+    return (
+      <Card className="border-destructive/30 bg-destructive/5">
+        <CardContent className="py-8 text-center text-sm text-destructive">{error}</CardContent>
+      </Card>
+    )
+  }
+
+  if (exams.length === 0) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center gap-2 py-16 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <CalendarDays className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <p className="font-medium">No exams found</p>
+          <p className="text-sm text-muted-foreground">
+            {canManage
+              ? "Schedule an exam to start collecting marks."
+              : "Results will appear here once your teachers publish them."}
+          </p>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
-    <div className="space-y-4">
-      {exams.map((exam) => (
-        <Card key={exam.id} className="border-0 shadow-sm hover:shadow-md transition-shadow group">
-          <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-              {/* Main Info */}
-              <div className="flex-1 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge className={cn("border-0 text-xs", getTypeColor(exam.type))}>{exam.type}</Badge>
-                      <Badge className={cn("border-0 text-xs", getStatusColor(exam.status))}>{exam.status}</Badge>
-                    </div>
-                    <h3 className="text-lg font-semibold">{exam.name}</h3>
-                  </div>
+    <div className="space-y-2">
+      {exams.map((exam) => {
+        const complete = exam.resultCount > 0
+        return (
+          <Card key={exam.id} className="transition-shadow hover:shadow-sm">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-start gap-3">
+                <div
+                  className={cn(
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                    exam.status === "PUBLISHED"
+                      ? "bg-emerald-50 text-emerald-600"
+                      : "bg-primary/10 text-primary",
+                  )}
+                >
+                  {exam.status === "PUBLISHED" ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : (
+                    <ClipboardList className="h-5 w-5" />
+                  )}
                 </div>
 
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>
-                      {new Date(exam.startDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      {exam.startDate !== exam.endDate &&
-                        ` - ${new Date(exam.endDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate font-medium">{exam.name}</p>
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      {EXAM_TYPE_LABEL[exam.type]}
+                    </Badge>
+                    <Badge
+                      variant="outline"
+                      className={cn("text-[10px]", STATUS_STYLES[exam.status])}
+                    >
+                      {EXAM_STATUS_LABEL[exam.status]}
+                    </Badge>
+                  </div>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {exam.className}
+                    {exam.sectionName ? `-${exam.sectionName}` : ""} · {exam.subjectName} ·{" "}
+                    {formatDate(exam.examDate)}
+                    {exam.startTime ? ` · ${exam.startTime}` : ""} · {exam.durationMin} min
+                  </p>
+
+                  <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {exam.resultCount} result{exam.resultCount === 1 ? "" : "s"}
                     </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    <span>{exam.totalStudents.toLocaleString()} students</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <FileText className="h-4 w-4" />
-                    <span>Classes: {exam.classes.join(", ")}</span>
+                    <span>Total {exam.totalMarks}</span>
+                    <span>Pass {exam.passingMarks}</span>
+                    {exam.averagePercent !== null && (
+                      <span className="font-medium text-foreground">Avg {exam.averagePercent}%</span>
+                    )}
                   </div>
                 </div>
-
-                {/* Progress */}
-                {exam.status !== "Upcoming" && (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        {exam.status === "Completed" ? "Results Entry" : "Marks Entry Progress"}
-                      </span>
-                      <span className="font-medium">{exam.progress}%</span>
-                    </div>
-                    <Progress value={exam.progress} className="h-2" />
-                  </div>
-                )}
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-2 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                {exam.status === "Completed" && exam.resultsPublished && (
-                  <Button variant="outline" size="sm" onClick={() => onViewExam?.(exam)} className="gap-2">
-                    <Eye className="h-4 w-4" />
-                    View Results
+              <div className="flex shrink-0 items-center gap-1 sm:justify-end">
+                {!canManage && onViewResult && (
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => onViewResult(exam)}>
+                    <Eye className="h-3.5 w-3.5" />
+                    Result
                   </Button>
                 )}
-                {exam.status === "In Progress" && (
-                  <Button size="sm" onClick={() => onEditExam?.(exam)} className="gap-2">
-                    <Edit className="h-4 w-4" />
-                    Enter Marks
-                  </Button>
+
+                {canManage && (
+                  <>
+                    <Button
+                      variant={complete ? "outline" : "default"}
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => onEnterMarks?.(exam)}
+                      disabled={!exam.canEnterMarks}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      {complete ? "Edit marks" : "Enter marks"}
+                    </Button>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => onEnterMarks?.(exam)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Marks entry
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onAnalyse?.(exam)} disabled={!complete}>
+                          <BarChart3 className="mr-2 h-4 w-4" />
+                          Analysis
+                        </DropdownMenuItem>
+                        {exam.status !== "PUBLISHED" && (
+                          <DropdownMenuItem onClick={() => onPublish?.(exam)} disabled={!exam.canPublish}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            Publish results
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => onDelete?.(exam)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete exam
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </>
                 )}
-                {exam.status === "Upcoming" && (
-                  <Button variant="outline" size="sm" onClick={() => onEditExam?.(exam)} className="gap-2">
-                    <Edit className="h-4 w-4" />
-                    Edit Exam
-                  </Button>
-                )}
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }
