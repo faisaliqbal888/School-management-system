@@ -280,6 +280,21 @@ A learner with no linked student record gets an empty but well-formed payload (`
 
 ---
 
+## Reports (ADMIN only)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/reports/fees` | Per class: students, invoices, billed, paid, outstanding, collection rate, overdue |
+| GET | `/reports/attendance?days=30` | Per section: roster size, marks, present/absent/late, rate (1–365 days) |
+| GET | `/reports/performance` | Latest completed/published exams: results, average, highest, lowest, pass rate |
+| GET | `/reports/enrolment` | Per class: sections, capacity, students, utilisation, gender and status split |
+| GET | `/reports/export?type=fees\|attendance\|performance\|enrolment&days=30` | CSV download (`text/csv`, `Content-Disposition: attachment`) |
+
+Every figure is computed on read — no materialised tables — and the CSV is generated from exactly
+the same rows the UI renders. Teachers and learners receive `403`.
+
+---
+
 ## Query parameters (list endpoints)
 
 | Param | Type | Default | Notes |
@@ -321,4 +336,4 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 | 2 ✅ | `/auth/*` (login, refresh, logout, me, change-password) · parent role |
 | 3 ✅ | `/students`, `/teachers`, `/attendance`, `/fees/*` |
 | 4 ◐ | `/exams`, `/results` ✅ · `/timetable` ✅ · `/notifications` ✅ · `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` pending |
-| 5 ◐ | `/dashboard/summary` ✅ · `/reports/*` pending |
+| 5 ✅ | `/dashboard/summary`, `/reports/*` incl. CSV export |

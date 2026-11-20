@@ -1,390 +1,187 @@
 "use client"
 
-import { useRequireRole } from "@/lib/auth-context"
-
-import { useState } from "react"
+import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Switch } from "@/components/ui/switch"
-import { useAuth } from "@/lib/auth-context"
-import {
-  User,
-  Mail,
-  Phone,
-  MapPin,
-  Calendar,
-  Briefcase,
-  Award,
-  Camera,
-  Edit3,
-  Save,
-  Shield,
-  Bell,
-  GraduationCap,
-  BookOpen,
-  Users,
-  Clock, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
+import { BookOpen, Briefcase, GraduationCap, Loader2, Mail, Phone, School, Users } from "lucide-react"
+import { useDashboardSummary } from "@/lib/hooks/use-dashboard"
+import type { TeacherProfile } from "@/lib/auth-context"
 
 export default function TeacherProfilePage() {
-  const { user } = useAuth()
   const { ready } = useRequireRole("TEACHER")
-  const [isEditing, setIsEditing] = useState(false)
+  const { user } = useAuth()
+  const { summary, isLoading } = useDashboardSummary()
 
-  if (!ready) return <FullPageLoader />
-
-  const teacherInfo = {
-    name: user?.name || "Mr. Sharma",
-    email: "sharma@eduflow.com",
-    phone: "+91 98765 12345",
-    address: "456, Teachers Colony, Delhi - 110001",
-    dateOfBirth: "10 January 1985",
-    joiningDate: "15 June 2015",
-    employeeId: "TCH-2015-001",
-    department: "Mathematics",
-    designation: "Senior Teacher",
-    qualification: "M.Sc. Mathematics, B.Ed",
-    experience: "9 Years",
-    specialization: "Algebra & Calculus",
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
-  const teachingStats = {
-    totalClasses: 8,
-    totalStudents: 320,
-    averageRating: 4.8,
-    classesThisWeek: 28,
-    hoursThisMonth: 120,
-    assignmentsGraded: 156,
-  }
+  const teacher = summary?.role === "TEACHER" ? summary : undefined
+  const profile = (user?.profile ?? null) as TeacherProfile | null
+  const attendanceRate = teacher?.attendance.trend.overall.rate ?? null
 
-  const qualifications = [
-    { degree: "M.Sc. Mathematics", institution: "Delhi University", year: "2008" },
-    { degree: "B.Ed", institution: "IGNOU", year: "2010" },
-    { degree: "B.Sc. Mathematics", institution: "Delhi University", year: "2006" },
-  ]
-
-  const achievements = [
-    { title: "Best Teacher Award", description: "Awarded by the school for outstanding performance", year: "2023" },
-    { title: "100% Board Results", description: "All students passed with distinction", year: "2022" },
-    { title: "Teacher Training Certification", description: "Advanced pedagogy training", year: "2021" },
+  const details = [
+    { label: "Employee no", value: teacher?.teacher.employeeNo ?? profile?.employeeNo ?? "—" },
+    { label: "Designation", value: teacher?.teacher.designation ?? profile?.designation ?? "—" },
+    { label: "Department", value: teacher?.teacher.department ?? profile?.department ?? "—" },
+    {
+      label: "Class teacher of",
+      value: profile?.classTeacherOf
+        ? `${profile.classTeacherOf.name}`
+        : "Not assigned",
+    },
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-emerald-50/30">
+    <div className="min-h-screen bg-background">
       <TeacherSidebar />
-      <div className="pl-64">
+      <div className="transition-all duration-300 lg:pl-64">
         <TeacherHeader />
-        <main className="p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground">My Profile</h1>
-            <p className="text-muted-foreground">View and manage your professional information</p>
+        <main className="min-h-screen space-y-6 bg-gradient-to-br from-slate-50 to-emerald-50/30 p-6">
+          <div>
+            <h1 className="text-2xl font-bold">My Profile</h1>
+            <p className="text-muted-foreground">Your staff record and this week&apos;s teaching load</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
-            {/* Profile Card */}
-            <Card className="border-0 shadow-lg overflow-hidden">
-              <div className="h-32 bg-gradient-to-r from-emerald-600 to-teal-600" />
-              <CardContent className="relative pt-0 -mt-16 text-center">
-                <div className="relative inline-block">
-                  <Avatar className="h-32 w-32 border-4 border-white shadow-xl">
-                    <AvatarImage src="/male-teacher-professional.jpg" />
-                    <AvatarFallback className="text-3xl bg-emerald-100 text-emerald-600">
-                      {teacherInfo.name.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button
-                    size="icon"
-                    className="absolute bottom-0 right-0 h-8 w-8 rounded-full bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    <Camera className="h-4 w-4" />
-                  </Button>
-                </div>
-                <h2 className="mt-4 text-xl font-bold">{teacherInfo.name}</h2>
-                <p className="text-muted-foreground">{teacherInfo.designation}</p>
-                <p className="text-sm text-muted-foreground">{teacherInfo.department} Department</p>
-                <div className="mt-4 flex justify-center gap-2">
-                  <Badge className="bg-emerald-100 text-emerald-700">Active</Badge>
-                  <Badge className="bg-blue-100 text-blue-700">{teacherInfo.experience}</Badge>
-                </div>
+            <Card className="overflow-hidden border-0 shadow-lg">
+              <div className="h-28 bg-gradient-to-r from-emerald-500 to-teal-600" />
+              <CardContent className="relative -mt-14 pt-0 text-center">
+                <Avatar className="mx-auto h-28 w-28 border-4 border-white shadow-xl">
+                  <AvatarImage src={user?.avatarUrl ?? undefined} alt={user?.name ?? "Teacher"} />
+                  <AvatarFallback className="bg-emerald-100 text-3xl text-emerald-700">
+                    {(user?.name ?? "T").charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
 
-                {/* Quick Stats */}
-                <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-                  <div className="p-3 rounded-xl bg-slate-50">
-                    <p className="text-2xl font-bold text-emerald-600">{teachingStats.totalClasses}</p>
-                    <p className="text-xs text-muted-foreground">Classes</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-50">
-                    <p className="text-2xl font-bold text-blue-600">{teachingStats.totalStudents}</p>
-                    <p className="text-xs text-muted-foreground">Students</p>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-50">
-                    <p className="text-2xl font-bold text-amber-600">{teachingStats.averageRating}</p>
-                    <p className="text-xs text-muted-foreground">Rating</p>
-                  </div>
+                <h2 className="mt-3 text-xl font-bold">{user?.name ?? "—"}</h2>
+                <p className="text-sm text-muted-foreground">
+                  {teacher?.teacher.designation ?? profile?.designation ?? "Teacher"}
+                </p>
+                <Badge className="mt-2" variant="secondary">
+                  {profile?.status ? profile.status.toLowerCase() : "active"} staff
+                </Badge>
+
+                <Separator className="my-4" />
+
+                <div className="space-y-2 text-left text-sm">
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <Mail className="h-3.5 w-3.5" />
+                    <span className="truncate">{user?.email ?? "—"}</span>
+                  </p>
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <Phone className="h-3.5 w-3.5" />
+                    {user?.phone ?? "Not on record"}
+                  </p>
+                  <p className="flex items-center gap-2 text-muted-foreground">
+                    <Briefcase className="h-3.5 w-3.5" />
+                    {teacher?.teacher.department ?? profile?.department ?? "—"}
+                  </p>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Details & Settings */}
-            <div className="lg:col-span-2">
-              <Tabs defaultValue="personal" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="personal">Personal</TabsTrigger>
-                  <TabsTrigger value="professional">Professional</TabsTrigger>
-                  <TabsTrigger value="achievements">Achievements</TabsTrigger>
-                  <TabsTrigger value="settings">Settings</TabsTrigger>
-                </TabsList>
+            <div className="space-y-6 lg:col-span-2">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Staff record</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <Skeleton className="h-24 w-full" />
+                  ) : (
+                    <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                      {details.map((detail) => (
+                        <div key={detail.label}>
+                          <dt className="text-xs text-muted-foreground">{detail.label}</dt>
+                          <dd className="truncate font-medium">{detail.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </CardContent>
+              </Card>
 
-                <TabsContent value="personal" className="mt-4 space-y-4">
-                  <Card className="border-0 shadow-md">
-                    <CardHeader className="flex flex-row items-center justify-between">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  {
+                    label: "Lessons / week",
+                    value: teacher?.counts.lessons ?? "—",
+                    icon: BookOpen,
+                    tone: "bg-emerald-50 text-emerald-600",
+                  },
+                  {
+                    label: "Sections",
+                    value: teacher?.counts.sections ?? "—",
+                    icon: School,
+                    tone: "bg-blue-50 text-blue-600",
+                  },
+                  {
+                    label: "Students",
+                    value: teacher?.counts.students ?? "—",
+                    icon: Users,
+                    tone: "bg-violet-50 text-violet-600",
+                  },
+                  {
+                    label: "Attendance (7d)",
+                    value: attendanceRate !== null ? `${attendanceRate}%` : "—",
+                    icon: GraduationCap,
+                    tone: "bg-amber-50 text-amber-600",
+                  },
+                ].map((stat) => (
+                  <Card key={stat.label}>
+                    <CardContent className="flex items-center gap-3 p-4">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.tone}`}>
+                        <stat.icon className="h-5 w-5" />
+                      </div>
                       <div>
-                        <CardTitle className="text-lg">Personal Information</CardTitle>
-                        <CardDescription>Your basic details and contact information</CardDescription>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => setIsEditing(!isEditing)} className="gap-2">
-                        {isEditing ? <Save className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
-                        {isEditing ? "Save" : "Edit"}
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Full Name</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.name}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Employee ID</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.employeeId}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Email Address</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.email}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Phone Number</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.phone}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Date of Birth</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.dateOfBirth}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Joining Date</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.joiningDate}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2 md:col-span-2">
-                        <Label className="text-muted-foreground">Address</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.address}</span>
-                        </div>
+                        <p className="text-xs text-muted-foreground">{stat.label}</p>
+                        <p className="text-lg font-bold">{stat.value}</p>
                       </div>
                     </CardContent>
                   </Card>
-                </TabsContent>
+                ))}
+              </div>
 
-                <TabsContent value="professional" className="mt-4 space-y-4">
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Professional Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Department</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <BookOpen className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.department}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Designation</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.designation}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Qualification</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.qualification}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-muted-foreground">Specialization</Label>
-                        <div className="flex items-center gap-2 p-3 rounded-lg bg-slate-50">
-                          <Award className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{teacherInfo.specialization}</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Subjects you teach</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                  {(profile?.subjects ?? []).length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No subjects recorded against your staff profile.</p>
+                  ) : (
+                    profile?.subjects.map((subject) => (
+                      <Badge key={subject.id} variant="secondary">
+                        {subject.name} · {subject.code}
+                      </Badge>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
 
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Educational Qualifications</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {qualifications.map((qual, index) => (
-                          <div key={index} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50">
-                            <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                              <GraduationCap className="h-5 w-5 text-emerald-600" />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-medium">{qual.degree}</h4>
-                              <p className="text-sm text-muted-foreground">{qual.institution}</p>
-                            </div>
-                            <Badge variant="outline">{qual.year}</Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Teaching Statistics</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100">
-                          <Users className="h-6 w-6 text-emerald-600" />
-                          <p className="mt-2 text-2xl font-bold">{teachingStats.totalStudents}</p>
-                          <p className="text-sm text-muted-foreground">Total Students</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-100">
-                          <Clock className="h-6 w-6 text-blue-600" />
-                          <p className="mt-2 text-2xl font-bold">{teachingStats.hoursThisMonth}</p>
-                          <p className="text-sm text-muted-foreground">Hours This Month</p>
-                        </div>
-                        <div className="p-4 rounded-xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-100">
-                          <BookOpen className="h-6 w-6 text-amber-600" />
-                          <p className="mt-2 text-2xl font-bold">{teachingStats.assignmentsGraded}</p>
-                          <p className="text-sm text-muted-foreground">Assignments Graded</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="achievements" className="mt-4">
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Achievements & Recognitions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {achievements.map((achievement, index) => (
-                          <div
-                            key={index}
-                            className="flex items-start gap-4 p-4 rounded-xl bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-100"
-                          >
-                            <div className="h-12 w-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-                              <Award className="h-6 w-6 text-amber-600" />
-                            </div>
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-amber-900">{achievement.title}</h4>
-                              <p className="text-sm text-amber-700">{achievement.description}</p>
-                            </div>
-                            <Badge variant="outline" className="border-amber-300 text-amber-700">
-                              {achievement.year}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="settings" className="mt-4 space-y-4">
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Bell className="h-5 w-5" />
-                        Notification Preferences
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Email Notifications</p>
-                          <p className="text-sm text-muted-foreground">Receive updates via email</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Class Reminders</p>
-                          <p className="text-sm text-muted-foreground">Get reminded before classes</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Parent Messages</p>
-                          <p className="text-sm text-muted-foreground">Notify for new parent messages</p>
-                        </div>
-                        <Switch defaultChecked />
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Shield className="h-5 w-5" />
-                        Security
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
-                        <Shield className="h-4 w-4" />
-                        Change Password
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
-                        <Mail className="h-4 w-4" />
-                        Update Email
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Need a change?</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-muted-foreground">
+                  Departments, designations and salary details are managed by the admin office.
+                  Ask HR to update your record if anything is out of date.
+                </CardContent>
+              </Card>
             </div>
           </div>
         </main>
       </div>
-    </div>
-  )
-}
-
-function FullPageLoader() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }
