@@ -1,66 +1,64 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { Progress } from "@/components/ui/progress"
+import { cn } from "@/lib/utils"
+import { money, type FeePosition } from "@/lib/hooks/use-dashboard"
 
-const data = [
-  { month: "Jan", collected: 45000, pending: 12000 },
-  { month: "Feb", collected: 52000, pending: 8000 },
-  { month: "Mar", collected: 48000, pending: 15000 },
-  { month: "Apr", collected: 61000, pending: 9000 },
-  { month: "May", collected: 55000, pending: 11000 },
-  { month: "Jun", collected: 67000, pending: 7000 },
-]
+interface Props {
+  fees: FeePosition | null | undefined
+  title?: string
+  className?: string
+}
 
-export function FeeCollectionChart() {
+export function FeeCollectionChart({ fees, title, className }: Props) {
+  const hasInvoices = (fees?.invoiceCount ?? 0) > 0
+
   return (
-    <Card className="border-0 shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-semibold">Fee Collection</CardTitle>
-        <p className="text-sm text-muted-foreground">Monthly fee collection status</p>
+    <Card className={cn("border-0 shadow-sm", className)}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg font-semibold">{title ?? "Fee collection"}</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          {hasInvoices ? `${fees?.invoiceCount} invoices raised` : "No invoices raised yet"}
+        </p>
       </CardHeader>
-      <CardContent>
-        <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.92 0.01 270)" vertical={false} />
-              <XAxis
-                dataKey="month"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: "oklch(0.50 0.02 270)", fontSize: 12 }}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: "oklch(0.50 0.02 270)", fontSize: 12 }}
-                tickFormatter={(value) => `$${value / 1000}k`}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "oklch(1 0 0)",
-                  border: "1px solid oklch(0.92 0.01 270)",
-                  borderRadius: "12px",
-                  boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-                }}
-                formatter={(value) => [`$${Number(value).toLocaleString("en-PK")}`, ""]}
-                labelStyle={{ color: "oklch(0.20 0.02 270)", fontWeight: 600 }}
-              />
-              <Bar dataKey="collected" fill="oklch(0.70 0.20 145)" radius={[6, 6, 0, 0]} name="Collected" />
-              <Bar dataKey="pending" fill="oklch(0.75 0.18 85)" radius={[6, 6, 0, 0]} name="Pending" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex items-center justify-center gap-6 pt-4">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-success" />
-            <span className="text-sm text-muted-foreground">Collected</span>
+
+      <CardContent className="space-y-4">
+        {!hasInvoices ? (
+          <div className="flex h-[180px] items-center justify-center text-sm text-muted-foreground">
+            Nothing has been billed yet.
           </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-warning" />
-            <span className="text-sm text-muted-foreground">Pending</span>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border bg-emerald-50/50 p-3">
+                <p className="text-xs text-muted-foreground">Collected</p>
+                <p className="text-xl font-bold text-emerald-700">PKR {money(fees?.paid ?? 0)}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  PKR {money(fees?.collectedThisMonth ?? 0)} this month
+                </p>
+              </div>
+              <div className="rounded-lg border bg-rose-50/50 p-3">
+                <p className="text-xs text-muted-foreground">Outstanding</p>
+                <p className="text-xl font-bold text-rose-700">PKR {money(fees?.outstanding ?? 0)}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {fees?.overdue ?? 0} overdue · {fees?.pending ?? 0} pending
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Collection rate</span>
+                <span className="font-semibold">{fees?.collectionRate ?? 0}%</span>
+              </div>
+              <Progress value={fees?.collectionRate ?? 0} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                PKR {money(fees?.paid ?? 0)} collected of PKR {money(fees?.billed ?? 0)} billed
+              </p>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   )

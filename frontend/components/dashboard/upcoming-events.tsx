@@ -1,81 +1,65 @@
 "use client"
 
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar, Clock, MapPin, ArrowRight } from "lucide-react"
+import { CalendarDays, CheckCircle2, ArrowRight } from "lucide-react"
+import { shortDate, type ExamRowLite } from "@/lib/hooks/use-dashboard"
 
-const events = [
-  {
-    id: 1,
-    title: "Parent-Teacher Meeting",
-    date: "Dec 15, 2025",
-    time: "10:00 AM",
-    location: "Main Hall",
-    color: "bg-primary",
-  },
-  {
-    id: 2,
-    title: "Annual Sports Day",
-    date: "Dec 20, 2025",
-    time: "9:00 AM",
-    location: "Sports Ground",
-    color: "bg-accent",
-  },
-  {
-    id: 3,
-    title: "Science Exhibition",
-    date: "Dec 22, 2025",
-    time: "11:00 AM",
-    location: "Science Lab",
-    color: "bg-warning",
-  },
-  {
-    id: 4,
-    title: "Winter Break Begins",
-    date: "Dec 25, 2025",
-    time: "All Day",
-    location: "School Wide",
-    color: "bg-success",
-  },
-]
+const STATUS_TONE: Record<string, string> = {
+  SCHEDULED: "bg-blue-100 text-blue-700",
+  ONGOING: "bg-amber-100 text-amber-700",
+  COMPLETED: "bg-violet-100 text-violet-700",
+  PUBLISHED: "bg-emerald-100 text-emerald-700",
+}
 
-export function UpcomingEvents() {
+interface Props {
+  exams: ExamRowLite[] | undefined
+  title?: string
+  href?: string
+}
+
+export function UpcomingEvents({ exams, title, href = "/admin/exams" }: Props) {
   return (
     <Card className="border-0 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle className="text-lg font-semibold">Upcoming Events</CardTitle>
-          <p className="text-sm text-muted-foreground">School calendar highlights</p>
-        </div>
-        <Button variant="ghost" size="sm" className="text-primary">
-          View all <ArrowRight className="ml-1 h-4 w-4" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+        <CardTitle className="text-lg font-semibold">{title ?? "Upcoming exams"}</CardTitle>
+        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+          <Link href={href} aria-label="All exams">
+            <ArrowRight className="h-4 w-4" />
+          </Link>
         </Button>
       </CardHeader>
+
       <CardContent>
-        <div className="space-y-4">
-          {events.map((event) => (
-            <div key={event.id} className="flex gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors group">
-              <div className={`w-1 rounded-full ${event.color}`} />
-              <div className="flex-1 space-y-1">
-                <p className="font-medium text-sm">{event.title}</p>
-                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {event.date}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {event.time}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {event.location}
-                  </span>
+        {(exams?.length ?? 0) === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-muted-foreground">
+            <CheckCircle2 className="h-7 w-7 text-emerald-500/60" />
+            No exams are scheduled.
+          </div>
+        ) : (
+          <ul className="space-y-2.5">
+            {exams?.map((exam) => (
+              <li key={exam.id} className="rounded-md border p-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium leading-tight">{exam.title}</p>
+                  <Badge className={STATUS_TONE[exam.status] ?? "bg-muted text-muted-foreground"}>
+                    {exam.status.toLowerCase()}
+                  </Badge>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <CalendarDays className="h-3 w-3" />
+                    {shortDate(exam.date)}
+                  </span>
+                  <span>{exam.className}</span>
+                  <span>{exam.results} results</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   )

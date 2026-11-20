@@ -260,6 +260,26 @@ target `STUDENTS`, `PARENTS` or one of their own classes — never `ALL` or anot
 
 ---
 
+## Dashboards
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/dashboard/summary` | authenticated | One role-shaped payload — see below |
+
+The response is shaped by role so the UI can never render data the caller isn't entitled to:
+
+| Role | Payload |
+|---|---|
+| ADMIN | `counts` (students/teachers/sections/classes/exams/notices), `attendance` (today + 7-day trend), `fees` (billed/paid/outstanding/collectionRate/overdue), `recentStudents`, `exams` (upcoming), `today` (lessons), `academicYear` |
+| TEACHER | `teacher` (designation/department/employeeNo), `counts` (lessons/sections/classes/subjects/students), `sections` (own, with head-counts), `attendance` (own sections), `exams` (own), `today` (own lessons) — **no `fees` key at all** |
+| STUDENT | `students` (self), `counts`, `attendance` (own), `fees` (own invoices only), `results` (own published results), `today` (own section's lessons) |
+| PARENT | same as STUDENT across every linked child |
+
+Attendance trends cover the trailing 7 days and carry `present / absent / late / total / rate`.
+A learner with no linked student record gets an empty but well-formed payload (`fees: null`).
+
+---
+
 ## Query parameters (list endpoints)
 
 | Param | Type | Default | Notes |
@@ -301,4 +321,4 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 | 2 ✅ | `/auth/*` (login, refresh, logout, me, change-password) · parent role |
 | 3 ✅ | `/students`, `/teachers`, `/attendance`, `/fees/*` |
 | 4 ◐ | `/exams`, `/results` ✅ · `/timetable` ✅ · `/notifications` ✅ · `/library`, `/transport`, `/hostel`, `/inventory`, `/payroll` pending |
-| 5 | `/dashboard/summary`, `/reports/*` |
+| 5 ◐ | `/dashboard/summary` ✅ · `/reports/*` pending |

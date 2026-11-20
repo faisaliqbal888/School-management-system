@@ -26,6 +26,7 @@ import { feesRouter } from './fees.routes.js'
 import { examsRouter } from './exams.routes.js'
 import { timetableRouter } from './timetable.routes.js'
 import { notificationsRouter } from './notifications.routes.js'
+import { dashboardRouter } from './dashboard.routes.js'
 
 apiRouter.use(authRouter)
 apiRouter.use(academicRouter)
@@ -36,3 +37,4 @@ apiRouter.use(feesRouter)
 apiRouter.use(examsRouter)
 apiRouter.use(timetableRouter)
 apiRouter.use(notificationsRouter)
+apiRouter.use(dashboardRouter)

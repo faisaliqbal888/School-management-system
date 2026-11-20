@@ -1,112 +1,74 @@
 "use client"
 
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MoreHorizontal, ArrowRight } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { ArrowRight, UserPlus } from "lucide-react"
+import { shortDate, type RecentStudent } from "@/lib/hooks/use-dashboard"
 
-const students = [
-  {
-    id: 1,
-    name: "Ali Khan",
-    class: "8-A",
-    admissionNo: "STU-2024-001",
-    status: "Active",
-    avatar: "/student-boy-portrait.jpg",
-  },
-  {
-    id: 2,
-    name: "Sara Ahmed",
-    class: "9-B",
-    admissionNo: "STU-2024-002",
-    status: "Active",
-    avatar: "/student-girl-portrait.jpg",
-  },
-  {
-    id: 3,
-    name: "Omar Hassan",
-    class: "7-C",
-    admissionNo: "STU-2024-003",
-    status: "Pending",
-    avatar: "/student-boy-portrait-young.jpg",
-  },
-  {
-    id: 4,
-    name: "Fatima Ali",
-    class: "10-A",
-    admissionNo: "STU-2024-004",
-    status: "Active",
-    avatar: "/student-girl-portrait-teen.jpg",
-  },
-  {
-    id: 5,
-    name: "Yusuf Ibrahim",
-    class: "6-B",
-    admissionNo: "STU-2024-005",
-    status: "Active",
-    avatar: "/student-boy-portrait-child.jpg",
-  },
-]
+interface Props {
+  students: RecentStudent[] | undefined
+  isLoading?: boolean
+}
 
-export function RecentStudents() {
+export function RecentStudents({ students, isLoading }: Props) {
   return (
     <Card className="border-0 shadow-sm">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <div>
-          <CardTitle className="text-lg font-semibold">Recent Enrollments</CardTitle>
-          <p className="text-sm text-muted-foreground">Latest student registrations</p>
+          <CardTitle className="text-lg font-semibold">Recent enrolments</CardTitle>
+          <p className="text-sm text-muted-foreground">Newest students on the register</p>
         </div>
-        <Button variant="ghost" size="sm" className="text-primary">
-          View all <ArrowRight className="ml-1 h-4 w-4" />
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/admin/students" className="gap-1">
+            All students <ArrowRight className="h-4 w-4" />
+          </Link>
         </Button>
       </CardHeader>
+
       <CardContent>
-        <div className="space-y-4">
-          {students.map((student) => (
-            <div
-              key={student.id}
-              className="flex items-center justify-between p-3 rounded-xl hover:bg-muted/50 transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 ring-2 ring-border">
-                  <AvatarImage src={student.avatar || "/placeholder.svg"} alt={student.name} />
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    {student.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </AvatarFallback>
+        {isLoading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-14 w-full" />
+            ))}
+          </div>
+        ) : (students?.length ?? 0) === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-center text-sm text-muted-foreground">
+            <UserPlus className="h-8 w-8 text-muted-foreground/50" />
+            No students have been admitted yet.
+          </div>
+        ) : (
+          <ul className="divide-y">
+            {students?.map((student) => (
+              <li key={student.id} className="flex items-center gap-3 py-2.5">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={student.avatarUrl ?? undefined} alt={student.name} />
+                  <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
                 </Avatar>
-                <div>
-                  <p className="font-medium text-sm">{student.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {student.admissionNo} • Class {student.class}
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{student.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {student.admissionNo}
+                    {student.className && ` · ${student.className}`}
+                    {student.sectionName && `-${student.sectionName}`}
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant={student.status === "Active" ? "default" : "secondary"}
-                  className={
-                    student.status === "Active"
-                      ? "bg-success/10 text-success hover:bg-success/20 border-0"
-                      : "bg-warning/10 text-warning hover:bg-warning/20 border-0"
-                  }
-                >
-                  {student.status}
+
+                <div className="hidden text-right text-xs text-muted-foreground sm:block">
+                  {shortDate(student.enrolledAt)}
+                </div>
+                <Badge variant={student.status === "ACTIVE" ? "secondary" : "outline"} className="shrink-0">
+                  {student.status.toLowerCase()}
                 </Badge>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </CardContent>
     </Card>
   )
