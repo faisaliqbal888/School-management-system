@@ -1,370 +1,143 @@
 "use client"
 
-import { useRequireRole } from "@/lib/auth-context"
-
-import { useState } from "react"
 import { StudentSidebar } from "@/components/student/student-sidebar"
 import { StudentHeader } from "@/components/student/student-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
-import { BookOpen, Clock, TrendingUp, FileText, Video, Download, CheckCircle2, Circle, Loader2 } from "lucide-react"
+import { Skeleton } from "@/components/ui/skeleton"
+import { BookOpen, Clock, DoorOpen, Loader2, TrendingUp, User } from "lucide-react"
+import { useRequireRole } from "@/lib/auth-context"
+import { useMySubjects } from "@/lib/hooks/use-subjects"
+import { gradeTone } from "@/lib/hooks/use-dashboard"
 import { cn } from "@/lib/utils"
-
-const subjects = [
-  {
-    id: 1,
-    name: "Mathematics",
-    code: "MATH-101",
-    teacher: "Mr. Sharma",
-    teacherAvatar: "/male-teacher.png",
-    credits: 5,
-    attendance: 92,
-    grade: "A",
-    progress: 68,
-    color: "bg-blue-500",
-    topics: [
-      { name: "Algebra", completed: true },
-      { name: "Calculus", completed: true },
-      { name: "Trigonometry", completed: true },
-      { name: "Statistics", completed: false },
-      { name: "Probability", completed: false },
-    ],
-    resources: [
-      { type: "pdf", name: "Chapter 1 - Introduction to Calculus", size: "2.4 MB" },
-      { type: "video", name: "Solving Quadratic Equations", duration: "25 min" },
-      { type: "pdf", name: "Practice Problems Set 1", size: "1.2 MB" },
-    ],
-    upcomingAssignments: [
-      { name: "Integration Practice", dueDate: "Dec 15, 2025" },
-      { name: "Chapter 5 Test", dueDate: "Dec 20, 2025" },
-    ],
-  },
-  {
-    id: 2,
-    name: "Physics",
-    code: "PHY-101",
-    teacher: "Mrs. Gupta",
-    teacherAvatar: "/female-teacher.png",
-    credits: 5,
-    attendance: 88,
-    grade: "A-",
-    progress: 55,
-    color: "bg-emerald-500",
-    topics: [
-      { name: "Mechanics", completed: true },
-      { name: "Thermodynamics", completed: true },
-      { name: "Optics", completed: false },
-      { name: "Electromagnetism", completed: false },
-      { name: "Modern Physics", completed: false },
-    ],
-    resources: [
-      { type: "pdf", name: "Newton's Laws Explained", size: "3.1 MB" },
-      { type: "video", name: "Wave Motion Animation", duration: "18 min" },
-    ],
-    upcomingAssignments: [{ name: "Lab Report - Optics", dueDate: "Dec 12, 2025" }],
-  },
-  {
-    id: 3,
-    name: "Chemistry",
-    code: "CHEM-101",
-    teacher: "Dr. Singh",
-    teacherAvatar: "/doctor-professor.jpg",
-    credits: 5,
-    attendance: 85,
-    grade: "B+",
-    progress: 45,
-    color: "bg-purple-500",
-    topics: [
-      { name: "Atomic Structure", completed: true },
-      { name: "Chemical Bonding", completed: true },
-      { name: "Organic Chemistry", completed: false },
-      { name: "Electrochemistry", completed: false },
-    ],
-    resources: [
-      { type: "pdf", name: "Periodic Table Guide", size: "1.8 MB" },
-      { type: "video", name: "Lab Safety Procedures", duration: "12 min" },
-    ],
-    upcomingAssignments: [{ name: "Organic Chemistry Quiz", dueDate: "Dec 18, 2025" }],
-  },
-  {
-    id: 4,
-    name: "English",
-    code: "ENG-101",
-    teacher: "Ms. Patel",
-    teacherAvatar: "/young-female-teacher.png",
-    credits: 4,
-    attendance: 95,
-    grade: "A",
-    progress: 72,
-    color: "bg-amber-500",
-    topics: [
-      { name: "Grammar Fundamentals", completed: true },
-      { name: "Essay Writing", completed: true },
-      { name: "Literature Analysis", completed: true },
-      { name: "Public Speaking", completed: false },
-    ],
-    resources: [
-      { type: "pdf", name: "Essay Writing Guide", size: "890 KB" },
-      { type: "pdf", name: "Shakespeare Collection", size: "4.2 MB" },
-    ],
-    upcomingAssignments: [{ name: "Book Review Essay", dueDate: "Dec 22, 2025" }],
-  },
-  {
-    id: 5,
-    name: "Computer Science",
-    code: "CS-101",
-    teacher: "Mr. Kumar",
-    teacherAvatar: "/tech-teacher.png",
-    credits: 4,
-    attendance: 90,
-    grade: "A",
-    progress: 60,
-    color: "bg-cyan-500",
-    topics: [
-      { name: "Programming Basics", completed: true },
-      { name: "Data Structures", completed: true },
-      { name: "Algorithms", completed: false },
-      { name: "Database Management", completed: false },
-    ],
-    resources: [
-      { type: "pdf", name: "Python Programming Guide", size: "5.6 MB" },
-      { type: "video", name: "Sorting Algorithms Explained", duration: "32 min" },
-    ],
-    upcomingAssignments: [{ name: "Coding Project", dueDate: "Dec 25, 2025" }],
-  },
-]
 
 export default function StudentSubjectsPage() {
   const { ready } = useRequireRole("STUDENT")
+  const { subjects, isLoading, error } = useMySubjects()
 
-  if (!ready) return <FullPageLoader />
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
-  const [selectedSubject, setSelectedSubject] = useState(subjects[0])
+  const graded = subjects.filter((subject) => subject.averagePercent !== null)
+  const classAverage =
+    graded.length === 0
+      ? null
+      : Math.round(graded.reduce((sum, subject) => sum + (subject.averagePercent ?? 0), 0) / graded.length)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50/30">
+    <div className="min-h-screen bg-background">
       <StudentSidebar />
-      <div className="pl-64">
+      <div className="transition-all duration-300 lg:pl-64">
         <StudentHeader />
-        <main className="p-6">
-          <div className="mb-6">
-            <h1 className="text-2xl font-bold text-foreground">My Subjects</h1>
-            <p className="text-muted-foreground">View your enrolled subjects and learning progress</p>
+        <main className="min-h-screen space-y-6 bg-gradient-to-br from-gray-50 via-white to-blue-50/20 p-6">
+          <div className="rounded-xl bg-gradient-to-r from-blue-500 to-indigo-600 p-6 text-white shadow-lg">
+            <h1 className="flex items-center gap-2 text-3xl font-bold">
+              <BookOpen className="h-7 w-7" /> My Subjects
+            </h1>
+            <p className="mt-1 text-blue-100">
+              {subjects.length} subjects this week
+              {classAverage !== null ? ` · ${classAverage}% average across graded subjects` : ""}
+            </p>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Subject List */}
-            <div className="space-y-3">
+          {error ? (
+            <Card>
+              <CardContent className="p-10 text-center text-sm text-muted-foreground">
+                Could not load your subjects. Please try again later.
+              </CardContent>
+            </Card>
+          ) : isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-44 w-full" />
+              ))}
+            </div>
+          ) : subjects.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
+                <BookOpen className="h-9 w-9 text-muted-foreground/50" />
+                <p className="font-medium">No subjects yet</p>
+                <p className="text-sm text-muted-foreground">
+                  Your timetable has not been published, so there are no subjects to list.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
               {subjects.map((subject) => (
-                <Card
-                  key={subject.id}
-                  className={cn(
-                    "cursor-pointer border-0 shadow-md transition-all hover:shadow-lg",
-                    selectedSubject.id === subject.id && "ring-2 ring-blue-500",
-                  )}
-                  onClick={() => setSelectedSubject(subject)}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
+                <Card key={subject.subjectId}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <CardTitle className="text-base">{subject.name}</CardTitle>
+                        <CardDescription>{subject.code ?? "—"}</CardDescription>
+                      </div>
                       <div
                         className={cn(
-                          "h-12 w-12 rounded-xl flex items-center justify-center text-white",
-                          subject.color,
+                          "flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-sm font-bold",
+                          gradeTone(subject.latestGrade),
                         )}
                       >
-                        <BookOpen className="h-6 w-6" />
+                        {subject.latestGrade ?? "—"}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate">{subject.name}</h3>
-                        <p className="text-sm text-muted-foreground">{subject.code}</p>
-                        <div className="mt-2 flex items-center gap-2">
-                          <Progress value={subject.progress} className="h-1.5 flex-1" />
-                          <span className="text-xs text-muted-foreground">{subject.progress}%</span>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {subject.teacherName ?? "Unassigned"}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {subject.periodsPerWeek} periods / week
+                      </span>
+                      {subject.roomNo && (
+                        <span className="flex items-center gap-1">
+                          <DoorOpen className="h-3 w-3" />
+                          {subject.roomNo}
+                        </span>
+                      )}
+                    </div>
+
+                    {subject.averagePercent !== null ? (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-1 text-muted-foreground">
+                            <TrendingUp className="h-3 w-3" /> Average
+                          </span>
+                          <span className="font-semibold">{subject.averagePercent}%</span>
+                        </div>
+                        <Progress value={subject.averagePercent} className="h-2" />
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          <Badge variant="secondary">{subject.resultsCount} results</Badge>
+                          {subject.bestPercent !== null && (
+                            <Badge variant="outline">best {subject.bestPercent}%</Badge>
+                          )}
+                          {subject.latestPercent !== null && (
+                            <Badge variant="outline">latest {subject.latestPercent}%</Badge>
+                          )}
                         </div>
                       </div>
-                      <Badge
-                        className={cn(
-                          subject.grade.startsWith("A")
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-blue-100 text-blue-700",
-                        )}
-                      >
-                        {subject.grade}
-                      </Badge>
-                    </div>
+                    ) : (
+                      <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                        No published results for this subject yet.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               ))}
             </div>
-
-            {/* Subject Details */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Header Card */}
-              <Card className="border-0 shadow-lg overflow-hidden">
-                <div className={cn("h-24", selectedSubject.color)} />
-                <CardContent className="relative pt-0 -mt-8">
-                  <div className="flex items-end gap-4">
-                    <div className="h-16 w-16 rounded-xl bg-white shadow-lg flex items-center justify-center">
-                      <BookOpen className={cn("h-8 w-8", selectedSubject.color.replace("bg-", "text-"))} />
-                    </div>
-                    <div className="flex-1 pb-2">
-                      <h2 className="text-xl font-bold">{selectedSubject.name}</h2>
-                      <p className="text-muted-foreground">{selectedSubject.code}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      <Badge variant="outline" className="gap-1">
-                        <Clock className="h-3 w-3" />
-                        {selectedSubject.credits} Credits
-                      </Badge>
-                      <Badge variant="outline" className="gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        {selectedSubject.attendance}% Attendance
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Teacher Info */}
-                  <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-slate-50">
-                    <Avatar>
-                      <AvatarImage src={selectedSubject.teacherAvatar || "/placeholder.svg"} />
-                      <AvatarFallback>{selectedSubject.teacher.charAt(0)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium">{selectedSubject.teacher}</p>
-                      <p className="text-xs text-muted-foreground">Subject Teacher</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Tabs */}
-              <Tabs defaultValue="syllabus" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
-                  <TabsTrigger value="resources">Resources</TabsTrigger>
-                  <TabsTrigger value="assignments">Assignments</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="syllabus" className="mt-4">
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Course Progress</CardTitle>
-                      <CardDescription>Topics covered in this subject</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {selectedSubject.topics.map((topic, index) => (
-                          <div
-                            key={index}
-                            className={cn(
-                              "flex items-center gap-3 p-3 rounded-xl transition-colors",
-                              topic.completed ? "bg-emerald-50" : "bg-slate-50",
-                            )}
-                          >
-                            {topic.completed ? (
-                              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                            ) : (
-                              <Circle className="h-5 w-5 text-muted-foreground" />
-                            )}
-                            <span
-                              className={cn("font-medium", topic.completed ? "text-emerald-700" : "text-foreground")}
-                            >
-                              {topic.name}
-                            </span>
-                            {topic.completed && (
-                              <Badge className="ml-auto bg-emerald-100 text-emerald-700">Completed</Badge>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="resources" className="mt-4">
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Learning Resources</CardTitle>
-                      <CardDescription>Download materials and watch videos</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {selectedSubject.resources.map((resource, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
-                          >
-                            {resource.type === "pdf" ? (
-                              <div className="h-10 w-10 rounded-lg bg-red-100 flex items-center justify-center">
-                                <FileText className="h-5 w-5 text-red-600" />
-                              </div>
-                            ) : (
-                              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                                <Video className="h-5 w-5 text-blue-600" />
-                              </div>
-                            )}
-                            <div className="flex-1">
-                              <p className="font-medium text-sm">{resource.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {resource.type === "pdf" ? resource.size : resource.duration}
-                              </p>
-                            </div>
-                            <Button size="sm" variant="ghost">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="assignments" className="mt-4">
-                  <Card className="border-0 shadow-md">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Upcoming Assignments</CardTitle>
-                      <CardDescription>Tasks and deadlines to complete</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {selectedSubject.upcomingAssignments.map((assignment, index) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50"
-                          >
-                            <div className="h-10 w-10 rounded-lg bg-amber-100 flex items-center justify-center">
-                              <FileText className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="font-medium">{assignment.name}</p>
-                              <p className="text-sm text-muted-foreground">Due: {assignment.dueDate}</p>
-                            </div>
-                            <Button size="sm" className="bg-amber-600 hover:bg-amber-700">
-                              Submit
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </div>
-          </div>
+          )}
         </main>
       </div>
-    </div>
-  )
-}
-
-function FullPageLoader() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }

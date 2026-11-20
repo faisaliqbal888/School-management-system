@@ -1,284 +1,144 @@
 "use client"
 
-import { useAuth, useRequireRole } from "@/lib/auth-context"
-import { useRouter } from "next/navigation"
 import { useState } from "react"
+import Link from "next/link"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
 import { Card, CardContent } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Loader2, Search, MessageSquare, Eye, TrendingUp, TrendingDown } from "lucide-react"
-
-const allStudents = [
-  {
-    id: "1",
-    name: "Alex Thompson",
-    class: "10-A",
-    rollNo: "01",
-    avatar: "/diverse-group-meeting.png",
-    attendance: 94,
-    avgGrade: "A",
-    trend: "up",
-    subjects: { Mathematics: "A+", Physics: "A" },
-  },
-  {
-    id: "2",
-    name: "Emma Wilson",
-    class: "10-A",
-    rollNo: "02",
-    avatar: "/portrait-young-woman.png",
-    attendance: 98,
-    avgGrade: "A+",
-    trend: "up",
-    subjects: { Mathematics: "A+", Physics: "A+" },
-  },
-  {
-    id: "3",
-    name: "Oliver Smith",
-    class: "10-A",
-    rollNo: "03",
-    avatar: "/oliver.jpg",
-    attendance: 88,
-    avgGrade: "B+",
-    trend: "down",
-    subjects: { Mathematics: "B+", Physics: "B" },
-  },
-  {
-    id: "4",
-    name: "James Brown",
-    class: "10-B",
-    rollNo: "01",
-    avatar: "/portrait-thoughtful-man.png",
-    attendance: 85,
-    avgGrade: "B+",
-    trend: "up",
-    subjects: { Mathematics: "B+" },
-  },
-  {
-    id: "5",
-    name: "Sophie Davis",
-    class: "9-A",
-    rollNo: "01",
-    avatar: "/sophie-davis.jpg",
-    attendance: 92,
-    avgGrade: "A",
-    trend: "up",
-    subjects: { Physics: "A" },
-  },
-  {
-    id: "6",
-    name: "Michael Lee",
-    class: "9-B",
-    rollNo: "01",
-    avatar: "/michael-lee.jpg",
-    attendance: 78,
-    avgGrade: "B",
-    trend: "down",
-    subjects: { Mathematics: "B" },
-  },
-]
+import { Skeleton } from "@/components/ui/skeleton"
+import { Loader2, Search, Users, ClipboardCheck, BookOpen } from "lucide-react"
+import { useRequireRole } from "@/lib/auth-context"
+import { useStudents } from "@/lib/hooks/use-students"
 
 export default function TeacherStudentsPage() {
-  const { user, isLoading, isAuthenticated } = useAuth()
-  const [selectedClass, setSelectedClass] = useState("all")
-  const [searchQuery, setSearchQuery] = useState("")
-
   const { ready } = useRequireRole("TEACHER")
 
-  const filteredStudents = allStudents.filter((student) => {
-    const matchesClass = selectedClass === "all" || student.class === selectedClass
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase())
-    return matchesClass && matchesSearch
+  const [search, setSearch] = useState("")
+  const [applied, setApplied] = useState("")
+
+  const { students, meta, isLoading, error } = useStudents({
+    page: 1,
+    limit: 50,
+    search: applied || undefined,
   })
 
-  if (!ready) return <FullPageLoader />
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <TeacherSidebar />
-      <div className="lg:pl-64 transition-all duration-300">
+      <div className="transition-all duration-300 lg:pl-64">
         <TeacherHeader />
-        <main className="p-6 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">My Students</h1>
-              <p className="text-muted-foreground">View and manage students in your classes</p>
-            </div>
+        <main className="min-h-screen space-y-6 bg-gradient-to-br from-gray-50 via-white to-emerald-50/20 p-6">
+          <div className="rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 p-6 text-white shadow-lg">
+            <h1 className="flex items-center gap-2 text-3xl font-bold">
+              <Users className="h-7 w-7" /> My Students
+            </h1>
+            <p className="mt-1 text-emerald-100">
+              {meta ? `${meta.total} students across the sections you teach` : "Students in your sections"}
+            </p>
           </div>
 
-          {/* Filters */}
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-4">
-              <div className="flex flex-wrap gap-4">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search students..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Filter by class" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Classes</SelectItem>
-                    <SelectItem value="10-A">Class 10-A</SelectItem>
-                    <SelectItem value="10-B">Class 10-B</SelectItem>
-                    <SelectItem value="9-A">Class 9-A</SelectItem>
-                    <SelectItem value="9-B">Class 9-B</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
+          <form
+            className="relative max-w-md"
+            onSubmit={(event) => {
+              event.preventDefault()
+              setApplied(search)
+            }}
+          >
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by name, admission no or roll no…"
+              className="pl-8"
+              aria-label="Search students"
+            />
+          </form>
 
-          {/* Students Grid */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredStudents.map((student) => (
-              <Card key={student.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="h-14 w-14">
-                      <AvatarImage src={student.avatar || "/placeholder.svg"} />
-                      <AvatarFallback className="bg-emerald-100 text-emerald-600">
-                        {student.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
+          {error ? (
+            <Card>
+              <CardContent className="p-10 text-center text-sm text-muted-foreground">{error}</CardContent>
+            </Card>
+          ) : isLoading ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Skeleton key={index} className="h-24 w-full" />
+              ))}
+            </div>
+          ) : students.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-14 text-center">
+                <Users className="h-9 w-9 text-muted-foreground/50" />
+                <p className="font-medium">No students found</p>
+                <p className="text-sm text-muted-foreground">
+                  {applied ? "Try a different search." : "You have no sections assigned yet."}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2">
+              {students.map((student) => (
+                <Card key={student.id}>
+                  <CardContent className="flex items-center gap-3 p-4">
+                    <Avatar className="h-11 w-11">
+                      <AvatarImage src={student.avatarUrl ?? undefined} alt={student.name} />
+                      <AvatarFallback className="bg-emerald-100 text-emerald-700">
+                        {student.name.charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-semibold">{student.name}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            Class {student.class} | Roll #{student.rollNo}
-                          </p>
-                        </div>
-                        {student.trend === "up" ? (
-                          <TrendingUp className="h-5 w-5 text-emerald-500" />
-                        ) : (
-                          <TrendingDown className="h-5 w-5 text-red-500" />
-                        )}
-                      </div>
 
-                      <div className="flex items-center gap-4 mt-3">
-                        <div>
-                          <p className="text-xs text-muted-foreground">Attendance</p>
-                          <p
-                            className={`font-semibold ${
-                              student.attendance >= 90
-                                ? "text-emerald-600"
-                                : student.attendance >= 75
-                                  ? "text-amber-600"
-                                  : "text-red-600"
-                            }`}
-                          >
-                            {student.attendance}%
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-muted-foreground">Avg Grade</p>
-                          <Badge
-                            variant="outline"
-                            className={
-                              student.avgGrade.includes("+") || student.avgGrade === "A"
-                                ? "border-emerald-500 text-emerald-600"
-                                : "border-blue-500 text-blue-600"
-                            }
-                          >
-                            {student.avgGrade}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{student.name}</p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {student.admissionNo}
+                        {student.rollNo ? ` · Roll ${student.rollNo}` : ""}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {student.className && (
+                          <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                            {student.className}
+                            {student.sectionName ? `-${student.sectionName}` : ""}
                           </Badge>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 mt-4">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>{student.name}</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="flex items-center gap-4">
-                                <Avatar className="h-16 w-16">
-                                  <AvatarImage src={student.avatar || "/placeholder.svg"} />
-                                  <AvatarFallback>
-                                    {student.name
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-semibold text-lg">{student.name}</p>
-                                  <p className="text-muted-foreground">
-                                    Class {student.class} | Roll #{student.rollNo}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <div className="p-3 rounded-lg bg-muted">
-                                  <p className="text-sm text-muted-foreground">Overall Attendance</p>
-                                  <p className="text-xl font-bold">{student.attendance}%</p>
-                                </div>
-                                <div className="p-3 rounded-lg bg-muted">
-                                  <p className="text-sm text-muted-foreground">Average Grade</p>
-                                  <p className="text-xl font-bold">{student.avgGrade}</p>
-                                </div>
-                              </div>
-                              <div>
-                                <p className="font-medium mb-2">Subject Performance</p>
-                                <div className="space-y-2">
-                                  {Object.entries(student.subjects).map(([subject, grade]) => (
-                                    <div
-                                      key={subject}
-                                      className="flex items-center justify-between p-2 rounded bg-muted"
-                                    >
-                                      <span>{subject}</span>
-                                      <Badge>{grade}</Badge>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                        <Button variant="outline" size="sm" className="flex-1 bg-transparent">
-                          <MessageSquare className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
+                        )}
+                        <Badge
+                          variant={student.status === "ACTIVE" ? "outline" : "destructive"}
+                          className="h-5 px-1.5 text-[10px]"
+                        >
+                          {student.status.toLowerCase()}
+                        </Badge>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+
+                    <div className="flex shrink-0 flex-col gap-1">
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" asChild>
+                        <Link href="/teacher/attendance">
+                          <ClipboardCheck className="mr-1 h-3 w-3" /> Attend
+                        </Link>
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 px-2 text-xs" asChild>
+                        <Link href="/teacher/results">
+                          <BookOpen className="mr-1 h-3 w-3" /> Marks
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </main>
       </div>
-    </div>
-  )
-}
-
-/** Shared loading fallback while the session is being verified. */
-function FullPageLoader() {
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
 }
