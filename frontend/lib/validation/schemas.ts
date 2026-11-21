@@ -309,3 +309,77 @@ export const teacherEditSchema = z.object({
   subjectIds: z.array(z.string()).optional(),
 })
 export type TeacherEditValues = z.infer<typeof teacherEditSchema>
+
+// ── Operations ───────────────────────────────────────────────
+export const VEHICLE_STATUSES = ["ACTIVE", "MAINTENANCE", "OUT_OF_SERVICE"] as const
+export const ROOM_TYPES = ["SINGLE", "DOUBLE", "TRIPLE", "DORMITORY"] as const
+export const ROOM_STATUSES = ["AVAILABLE", "FULL", "MAINTENANCE"] as const
+export const ITEM_CONDITIONS = ["NEW", "GOOD", "FAIR", "POOR", "DAMAGED"] as const
+
+export const vehicleSchema = z.object({
+  registrationNo: z.string().trim().min(2, "Registration is required").max(20),
+  model: z.string().trim().min(1, "Model is required").max(60),
+  capacity: z.coerce.number().int().min(1, "At least one seat").max(120),
+  driverName: z.string().trim().min(2, "Driver name is required").max(80),
+  driverPhone: phone,
+  conductorName: z.string().trim().max(80),
+  status: z.enum(VEHICLE_STATUSES),
+  lastServiceAt: z.string(),
+})
+export type VehicleValues = z.infer<typeof vehicleSchema>
+
+export const routeSchema = z.object({
+  name: z.string().trim().min(3, "Route name is required").max(80),
+  startPoint: z.string().trim().min(1, "Start point is required").max(80),
+  endPoint: z.string().trim().min(1, "End point is required").max(80),
+  distanceKm: z.coerce.number().min(0, "Cannot be negative").max(500),
+  monthlyFee: z.coerce.number().min(0, "Cannot be negative").max(1_000_000),
+  vehicleId: z.string(),
+  isActive: z.boolean(),
+})
+export type RouteValues = z.infer<typeof routeSchema>
+
+export const roomSchema = z.object({
+  block: z.string().trim().min(1, "Block is required").max(20),
+  roomNo: z.string().trim().min(1, "Room number is required").max(20),
+  type: z.enum(ROOM_TYPES),
+  capacity: z.coerce.number().int().min(1, "At least one bed").max(40),
+  monthlyFee: z.coerce.number().min(0, "Cannot be negative").max(1_000_000),
+  status: z.enum(ROOM_STATUSES),
+})
+export type RoomValues = z.infer<typeof roomSchema>
+
+export const itemSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
+  code: z.string().trim().min(1, "Code is required").max(40),
+  category: z.string().trim().min(1, "Category is required").max(60),
+  quantity: z.coerce.number().int().min(0, "Cannot be negative"),
+  minQuantity: z.coerce.number().int().min(0, "Cannot be negative"),
+  unitPrice: z.coerce.number().min(0, "Cannot be negative"),
+  location: z.string().trim().max(80),
+  supplier: z.string().trim().max(120),
+  condition: z.enum(ITEM_CONDITIONS),
+})
+export type ItemValues = z.infer<typeof itemSchema>
+
+export const stockAdjustSchema = z.object({
+  delta: z.coerce
+    .number()
+    .int("Use a whole number")
+    .refine((v) => v !== 0, "Enter a non-zero change"),
+  reason: z.string().trim().min(3, "Give a reason for the adjustment").max(200),
+})
+export type StockAdjustValues = z.infer<typeof stockAdjustSchema>
+
+export const leaveSchema = z
+  .object({
+    subject: z.string().min(1, "Choose a staff member"),
+    fromDate: z.string().min(1, "Choose a start date"),
+    toDate: z.string().min(1, "Choose an end date"),
+    reason: z.string().trim().min(3, "Give a reason").max(300),
+  })
+  .refine((v) => new Date(v.toDate) >= new Date(v.fromDate), {
+    message: "The end date cannot be before the start date",
+    path: ["toDate"],
+  })
+export type LeaveValues = z.infer<typeof leaveSchema>

@@ -10,10 +10,11 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarDays, DollarSign, Loader2, Users, Wallet } from "lucide-react"
+import { CalendarDays, Check, DollarSign, Loader2, Plus, Users, Wallet, X } from "lucide-react"
 import { useRequireRole } from "@/lib/auth-context"
 import { useTeachers } from "@/lib/hooks/use-teachers"
-import { money, useLeaveRequests, usePayroll } from "@/lib/hooks/use-operations"
+import { money, useLeaveMutations, useLeaveRequests, usePayroll, usePayrollMutations } from "@/lib/hooks/use-operations"
+import { LeaveDialog, PayrollRunDialog } from "@/components/operations/hr-dialogs"
 import { useStaffDirectory } from "@/lib/hooks/use-admin"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -87,8 +88,14 @@ export default function AdminHrPage() {
     [teachers, officeStaff],
   )
   const directoryLoading = staffLoading || teachersLoading
-  const { payroll, isLoading: payrollLoading } = usePayroll(period)
-  const { leaves, isLoading: leavesLoading } = useLeaveRequests()
+  const { payroll, isLoading: payrollLoading, refetch: refetchPayroll } = usePayroll(period)
+  const { leaves, isLoading: leavesLoading, refetch: refetchLeaves } = useLeaveRequests()
+
+  const { pay } = usePayrollMutations(refetchPayroll)
+  const { decide } = useLeaveMutations(refetchLeaves)
+
+  const [runOpen, setRunOpen] = useState(false)
+  const [leaveOpen, setLeaveOpen] = useState(false)
 
   const stats = useMemo(
     () => [
@@ -143,9 +150,14 @@ export default function AdminHrPage() {
               <h1 className="text-2xl font-bold">HR &amp; Payroll</h1>
               <p className="text-muted-foreground">Staff directory, monthly payroll runs and leave requests</p>
             </div>
-            <Button asChild>
-              <Link href="/admin/teachers">Manage staff</Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" asChild>
+                <Link href="/admin/teachers">Manage staff</Link>
+              </Button>
+              <Button onClick={() => setRunOpen(true)}>
+                <Wallet className="mr-2 h-4 w-4" /> Run payroll
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -205,6 +217,25 @@ export default function AdminHrPage() {
                       disabled={(payroll?.rows.length ?? 0) === 0}
                     >
                       Download CSV
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={pay.isPending || (payroll?.totals.draft ?? 0) === 0 || !payroll?.period}
+                      onClick={async () => {
+                        try {
+                          const result = await pay.mutate(payroll!.period!)
+                          toast.success(
+                            result.marked > 0
+                              ? `${result.marked} row(s) marked paid`
+                              : "Everything in this period was already paid",
+                          )
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Could not mark payroll paid")
+                        }
+                      }}
+                    >
+                      {pay.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Mark period paid
                     </Button>
                   </div>
 
@@ -319,6 +350,11 @@ export default function AdminHrPage() {
 
                 {/* ── Leave ───────────────────────────────── */}
                 <TabsContent value="leave" className="mt-4 space-y-3">
+                  <div className="flex justify-end">
+                    <Button size="sm" variant="outline" onClick={() => setLeaveOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" /> Record leave
+                    </Button>
+                  </div>
                   {leavesLoading ? (
                     <Skeleton className="h-24 w-full" />
                   ) : leaves.length === 0 ? (
@@ -338,9 +374,49 @@ export default function AdminHrPage() {
                             {shortDate(request.fromDate)} → {shortDate(request.toDate)}
                           </p>
                         </div>
-                        <Badge variant={request.status === "PENDING" ? "outline" : "secondary"}>
-                          {request.status.toLowerCase()}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={request.status === "PENDING" ? "outline" : "secondary"}>
+                            {request.status.toLowerCase()}
+                          </Badge>
+                          {request.status === "PENDING" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2"
+                                disabled={decide.isPending}
+                                aria-label={`Approve leave for ${request.name}`}
+                                onClick={async () => {
+                                  try {
+                                    await decide.mutate({ id: request.id, decision: "APPROVED" })
+                                    toast.success("Leave approved")
+                                  } catch (err) {
+                                    toast.error(err instanceof Error ? err.message : "Could not approve")
+                                  }
+                                }}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-destructive"
+                                disabled={decide.isPending}
+                                aria-label={`Reject leave for ${request.name}`}
+                                onClick={async () => {
+                                  try {
+                                    await decide.mutate({ id: request.id, decision: "REJECTED" })
+                                    toast.success("Leave rejected")
+                                  } catch (err) {
+                                    toast.error(err instanceof Error ? err.message : "Could not reject")
+                                  }
+                                }}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -348,6 +424,8 @@ export default function AdminHrPage() {
               </Tabs>
             </CardContent>
           </Card>
+          <PayrollRunDialog open={runOpen} onOpenChange={setRunOpen} onSaved={refetchPayroll} />
+          <LeaveDialog open={leaveOpen} onOpenChange={setLeaveOpen} onSaved={refetchLeaves} />
         </main>
       </div>
     </div>

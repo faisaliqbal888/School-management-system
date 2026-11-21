@@ -7,9 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
-import { AlertTriangle, Boxes, Loader2, Package, Search, Wallet } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { AlertTriangle, ArrowLeftRight, Boxes, Loader2, Package, Pencil, Plus, Search, Wallet } from "lucide-react"
 import { useRequireRole } from "@/lib/auth-context"
 import { money, useInventoryOverview } from "@/lib/hooks/use-operations"
+import { ItemDialog, StockAdjustDialog } from "@/components/operations/inventory-dialogs"
 import { cn } from "@/lib/utils"
 
 const conditionTone: Record<string, string> = {
@@ -23,7 +25,11 @@ const conditionTone: Record<string, string> = {
 
 export default function AdminInventoryPage() {
   const { ready } = useRequireRole("ADMIN")
-  const { overview, isLoading, error } = useInventoryOverview()
+  const { overview, isLoading, error, refetch } = useInventoryOverview()
+
+  const [itemOpen, setItemOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<(typeof items)[number] | null>(null)
+  const [adjustItem, setAdjustItem] = useState<(typeof items)[number] | null>(null)
   const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
 
@@ -68,9 +74,19 @@ export default function AdminInventoryPage() {
       <div className="transition-all duration-300 lg:pl-64">
         <AdminHeader />
         <main className="space-y-6 p-6">
-          <div>
-            <h1 className="text-2xl font-bold">Inventory</h1>
-            <p className="text-muted-foreground">Stock levels, valuations and low-stock alerts</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Inventory</h1>
+              <p className="text-muted-foreground">Stock levels, valuations and low-stock alerts</p>
+            </div>
+            <Button
+              onClick={() => {
+                setEditingItem(null)
+                setItemOpen(true)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add item
+            </Button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -142,6 +158,7 @@ export default function AdminInventoryPage() {
                           <th className="py-2 text-right">Value</th>
                           <th className="py-2">Condition</th>
                           <th className="py-2">Location</th>
+                          <th className="py-2 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -169,6 +186,30 @@ export default function AdminInventoryPage() {
                               </Badge>
                             </td>
                             <td className="py-2 text-muted-foreground">{item.location ?? "—"}</td>
+                            <td className="py-2">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => setAdjustItem(item)}
+                                >
+                                  <ArrowLeftRight className="mr-1 h-3 w-3" /> Adjust
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  aria-label={`Edit ${item.name}`}
+                                  onClick={() => {
+                                    setEditingItem(item)
+                                    setItemOpen(true)
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -197,6 +238,13 @@ export default function AdminInventoryPage() {
               </CardContent>
             </Card>
           )}
+          <ItemDialog open={itemOpen} onOpenChange={setItemOpen} item={editingItem} onSaved={refetch} />
+          <StockAdjustDialog
+            open={adjustItem !== null}
+            onOpenChange={(next) => !next && setAdjustItem(null)}
+            item={adjustItem}
+            onSaved={refetch}
+          />
         </main>
       </div>
     </div>

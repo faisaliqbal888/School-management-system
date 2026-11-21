@@ -272,3 +272,195 @@ export const money = (value: number) =>
     : value >= 10_000
       ? `${Math.round(value / 1000)}K`
       : value.toLocaleString("en-GB")
+
+// ─────────────────────────────────────────────────────────────
+//  Transport — mutations
+// ─────────────────────────────────────────────────────────────
+
+export interface VehicleInput {
+  registrationNo: string
+  model: string
+  capacity: number
+  driverName: string
+  driverPhone: string
+  conductorName?: string | null
+  status?: "ACTIVE" | "MAINTENANCE" | "OUT_OF_SERVICE"
+  lastServiceAt?: string | null
+}
+
+export interface RouteInput {
+  name: string
+  startPoint: string
+  endPoint: string
+  distanceKm?: number
+  monthlyFee?: number
+  vehicleId?: string | null
+  isActive?: boolean
+}
+
+function changed(onDone?: () => void) {
+  return <T>(result: T): T => {
+    onDone?.()
+    return result
+  }
+}
+
+export function useVehicleMutations(onChanged?: () => void) {
+  const create = useApiMutation<{ id: string }, VehicleInput>(async (body) =>
+    changed(onChanged)(await apiFetch<{ id: string }>("/transport/vehicles", { method: "POST", body })),
+  )
+  const update = useApiMutation<{ id: string }, { id: string } & Partial<VehicleInput>>(async ({ id, ...body }) =>
+    changed(onChanged)(await apiFetch<{ id: string }>(`/transport/vehicles/${id}`, { method: "PATCH", body })),
+  )
+  const remove = useApiMutation<{ deleted: boolean }, string>(async (id) =>
+    changed(onChanged)(await apiFetch<{ deleted: boolean }>(`/transport/vehicles/${id}`, { method: "DELETE" })),
+  )
+  return { create, update, remove }
+}
+
+export function useRouteMutations(onChanged?: () => void) {
+  const create = useApiMutation<{ id: string }, RouteInput>(async (body) =>
+    changed(onChanged)(await apiFetch<{ id: string }>("/transport/routes", { method: "POST", body })),
+  )
+  const update = useApiMutation<{ id: string }, { id: string } & Partial<RouteInput>>(async ({ id, ...body }) =>
+    changed(onChanged)(await apiFetch<{ id: string }>(`/transport/routes/${id}`, { method: "PATCH", body })),
+  )
+  const remove = useApiMutation<{ deleted: boolean }, string>(async (id) =>
+    changed(onChanged)(await apiFetch<{ deleted: boolean }>(`/transport/routes/${id}`, { method: "DELETE" })),
+  )
+  const assign = useApiMutation<{ id: string }, { routeId: string; studentId: string; stopName?: string | null }>(
+    async ({ routeId, ...body }) =>
+      changed(onChanged)(
+        await apiFetch<{ id: string }>(`/transport/routes/${routeId}/riders`, { method: "POST", body }),
+      ),
+  )
+  const unassign = useApiMutation<{ deleted: boolean }, string>(async (id) =>
+    changed(onChanged)(await apiFetch<{ deleted: boolean }>(`/transport/riders/${id}`, { method: "DELETE" })),
+  )
+  return { create, update, remove, assign, unassign }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Hostel — mutations
+// ─────────────────────────────────────────────────────────────
+
+export interface RoomInput {
+  block: string
+  roomNo: string
+  type?: "SINGLE" | "DOUBLE" | "TRIPLE" | "DORMITORY"
+  capacity: number
+  monthlyFee?: number
+  status?: "AVAILABLE" | "FULL" | "MAINTENANCE"
+}
+
+export function useRoomMutations(onChanged?: () => void) {
+  const create = useApiMutation<{ id: string }, RoomInput>(async (body) =>
+    changed(onChanged)(await apiFetch<{ id: string }>("/hostel/rooms", { method: "POST", body })),
+  )
+  const update = useApiMutation<{ id: string }, { id: string } & Partial<RoomInput>>(async ({ id, ...body }) =>
+    changed(onChanged)(await apiFetch<{ id: string }>(`/hostel/rooms/${id}`, { method: "PATCH", body })),
+  )
+  const remove = useApiMutation<{ deleted: boolean }, string>(async (id) =>
+    changed(onChanged)(await apiFetch<{ deleted: boolean }>(`/hostel/rooms/${id}`, { method: "DELETE" })),
+  )
+  const allocate = useApiMutation<{ id: string; occupied: number; capacity: number }, { roomId: string; studentId: string }>(
+    async ({ roomId, studentId }) =>
+      changed(onChanged)(
+        await apiFetch<{ id: string; occupied: number; capacity: number }>(
+          `/hostel/rooms/${roomId}/allocate`,
+          { method: "POST", body: { studentId } },
+        ),
+      ),
+  )
+  const vacate = useApiMutation<{ vacated: boolean; occupied: number }, string>(async (allocationId) =>
+    changed(onChanged)(
+      await apiFetch<{ vacated: boolean; occupied: number }>(`/hostel/allocations/${allocationId}/vacate`, {
+        method: "POST",
+      }),
+    ),
+  )
+  return { create, update, remove, allocate, vacate }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Inventory — mutations
+// ─────────────────────────────────────────────────────────────
+
+export interface ItemInput {
+  name: string
+  code: string
+  category: string
+  quantity?: number
+  minQuantity?: number
+  unitPrice?: number
+  location?: string | null
+  supplier?: string | null
+  condition?: "NEW" | "GOOD" | "FAIR" | "POOR" | "DAMAGED"
+  purchasedAt?: string | null
+}
+
+export function useItemMutations(onChanged?: () => void) {
+  const create = useApiMutation<{ id: string }, ItemInput>(async (body) =>
+    changed(onChanged)(await apiFetch<{ id: string }>("/inventory/items", { method: "POST", body })),
+  )
+  const update = useApiMutation<{ id: string }, { id: string } & Partial<ItemInput>>(async ({ id, ...body }) =>
+    changed(onChanged)(await apiFetch<{ id: string }>(`/inventory/items/${id}`, { method: "PATCH", body })),
+  )
+  const remove = useApiMutation<{ deleted: boolean }, string>(async (id) =>
+    changed(onChanged)(await apiFetch<{ deleted: boolean }>(`/inventory/items/${id}`, { method: "DELETE" })),
+  )
+  const adjust = useApiMutation<{ quantity: number; lowStock: boolean }, { id: string; delta: number; reason: string }>(
+    async ({ id, ...body }) =>
+      changed(onChanged)(
+        await apiFetch<{ quantity: number; lowStock: boolean }>(`/inventory/items/${id}/adjust`, {
+          method: "POST",
+          body,
+        }),
+      ),
+  )
+  return { create, update, remove, adjust }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  HR — mutations
+// ─────────────────────────────────────────────────────────────
+
+export function usePayrollMutations(onChanged?: () => void) {
+  const run = useApiMutation<{ period: string; created: number; skipped: number; total: number }, string>(
+    async (period) =>
+      changed(onChanged)(
+        await apiFetch<{ period: string; created: number; skipped: number; total: number }>("/hr/payroll/run", {
+          method: "POST",
+          body: { period },
+        }),
+      ),
+  )
+  const pay = useApiMutation<{ period: string; marked: number }, string>(async (period) =>
+    changed(onChanged)(
+      await apiFetch<{ period: string; marked: number }>("/hr/payroll/pay", {
+        method: "POST",
+        body: { period },
+      }),
+    ),
+  )
+  return { run, pay }
+}
+
+export function useLeaveMutations(onChanged?: () => void) {
+  const create = useApiMutation<
+    { id: string },
+    { teacherId?: string | null; staffId?: string | null; fromDate: string; toDate: string; reason: string }
+  >(async (body) =>
+    changed(onChanged)(await apiFetch<{ id: string }>("/hr/leaves", { method: "POST", body })),
+  )
+  const decide = useApiMutation<{ id: string; status: string }, { id: string; decision: "APPROVED" | "REJECTED" }>(
+    async ({ id, decision }) =>
+      changed(onChanged)(
+        await apiFetch<{ id: string; status: string }>(`/hr/leaves/${id}`, {
+          method: "PATCH",
+          body: { decision },
+        }),
+      ),
+  )
+  return { create, decide }
+}
