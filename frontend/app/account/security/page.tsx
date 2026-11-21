@@ -2,6 +2,7 @@
 
 import { useAuth, useRequireRole } from "@/lib/auth-context"
 import { ChangePasswordCard, DevicesCard, PersonalDetailsCard } from "@/components/account/account-security"
+import { AvatarUploader } from "@/components/account/avatar-uploader"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, ShieldCheck } from "lucide-react"
@@ -35,6 +36,18 @@ export default function AccountSecurityPage() {
         </div>
         <Badge variant="secondary">Signed in as {user.role.toLowerCase()}</Badge>
       </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <AvatarUploader
+            name={user.name}
+            currentUrl={user.avatarUrl}
+            onUploaded={() => {
+              void refreshUser()
+            }}
+          />
+        </CardContent>
+      </Card>
 
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="p-4 text-sm">

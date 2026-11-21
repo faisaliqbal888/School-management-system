@@ -30,6 +30,7 @@ import { dashboardRouter } from './dashboard.routes.js'
 import { reportsRouter } from './reports.routes.js'
 import { adminRouter } from './admin.routes.js'
 import { operationsRouter } from './operations.routes.js'
+import { uploadsRouter } from './uploads.routes.js'
 
 apiRouter.use(authRouter)
 apiRouter.use(academicRouter)
@@ -44,3 +45,4 @@ apiRouter.use(dashboardRouter)
 apiRouter.use(reportsRouter)
 apiRouter.use(operationsRouter)
 apiRouter.use(adminRouter)
+apiRouter.use(uploadsRouter)

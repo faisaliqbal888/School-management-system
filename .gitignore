@@ -37,3 +37,7 @@ pnpm-debug.log*
 
 # local sandbox postgres binaries (never commit)
 .pgbin/
+
+# user-uploaded files (avatars)
+backend/uploads/
+uploads-test/

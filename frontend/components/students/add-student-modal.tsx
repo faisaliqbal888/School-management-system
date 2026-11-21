@@ -23,8 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Camera, User, Users, FileText, Loader2, Copy, Check, CheckCircle2 } from "lucide-react"
+import { User, Users, FileText, Loader2, Copy, Check, CheckCircle2 } from "lucide-react"
 import { useApiQuery } from "@/lib/hooks/use-api-query"
 import { useCreateStudent } from "@/lib/hooks/use-students"
 import { studentSchema, type StudentFormValues } from "@/lib/validation/schemas"
@@ -227,27 +226,10 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
 
           {/* PERSONAL */}
           <TabsContent value="personal" className="mt-6 space-y-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20 ring-4 ring-border">
-                <AvatarFallback className="bg-primary/10 text-2xl text-primary">
-                  {values.name
-                    .split(" ")
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((n) => n[0]?.toUpperCase())
-                    .join("") || "ST"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Photo</p>
-                <p className="text-xs text-muted-foreground">
-                  Photo upload arrives with file storage in a later phase
-                </p>
-              </div>
-              <Button size="icon" variant="outline" className="ml-auto" disabled>
-                <Camera className="h-4 w-4" />
-              </Button>
-            </div>
+            <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+              The photo is set by the student after their first sign-in, from Account &amp; security —
+              uploads are tied to the signed-in account, so an admin cannot set another person&apos;s.
+            </p>
 
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Full Name" required error={form.formState.errors.name?.message}>

@@ -5,6 +5,7 @@ import compression from 'compression'
 import cookieParser from 'cookie-parser'
 import morgan from 'morgan'
 
+import path from 'node:path'
 import { config } from './config/env.js'
 import { globalLimiter } from './middleware/rate-limit.js'
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js'
@@ -63,6 +64,23 @@ export function createApp(): Express {
   if (!config.isTest) {
     app.use(morgan(config.isProd ? 'combined' : 'dev'))
   }
+
+  // ── uploaded files ────────────────────────────────────────
+  // Avatars are the only user-supplied files the app serves. `Content-Disposition`
+  // and the mime allowlist stop a stray HTML file from ever being rendered, and
+  // no directory listing is exposed.
+  app.use(
+    '/uploads',
+    express.static(process.env.UPLOAD_DIR ?? path.join(process.cwd(), 'uploads'), {
+      index: false,
+      dotfiles: 'deny',
+      maxAge: '1d',
+      setHeaders(res) {
+        res.setHeader('Content-Disposition', 'inline')
+        res.setHeader('X-Content-Type-Options', 'nosniff')
+      },
+    }),
+  )
 
   // ── routes ────────────────────────────────────────────────
   app.use(config.apiPrefix, globalLimiter)
