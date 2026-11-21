@@ -23,7 +23,7 @@ env:
 # workspace directory.
 jobs:
   frontend:
-    name: Frontend — lint, typecheck & build
+    name: Frontend — lint, typecheck, test & build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,6 +39,7 @@ jobs:
       # Next 16 removed `next lint`; the script runs ESLint 9 directly.
       - run: npm run lint --workspace=frontend
       - run: npm run typecheck --workspace=frontend
+      - run: npm test --workspace=frontend
       - run: npm run build --workspace=frontend
         env:
           NEXT_TELEMETRY_DISABLED: "1"

@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -30,6 +32,7 @@ import {
   type EmploymentType,
   type StaffStatus,
 } from "@/lib/hooks/use-teachers"
+import { teacherEditSchema, type TeacherEditValues } from "@/lib/validation/schemas"
 
 interface EditTeacherModalProps {
   teacherId: string | null
@@ -50,25 +53,30 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
   const { options } = useTeacherOptions(open)
   const updateTeacher = useUpdateTeacher()
 
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    department: "",
-    designation: "",
-    qualification: "",
-    specialization: "",
-    joiningDate: "",
-    employmentType: "PERMANENT" as EmploymentType,
-    baseSalary: "",
-    status: "ACTIVE" as StaffStatus,
-    subjectIds: [] as string[],
+  const form = useForm<TeacherEditValues>({
+    resolver: zodResolver(teacherEditSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+      department: "",
+      designation: "",
+      qualification: "",
+      specialization: "",
+      joiningDate: "",
+      employmentType: "PERMANENT",
+      baseSalary: 0,
+      status: "ACTIVE",
+      subjectIds: [],
+    },
   })
+  const values = form.watch()
+  const subjectIds = values.subjectIds ?? []
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     if (!teacher) return
-    setForm({
+    form.reset({
       name: teacher.name,
       phone: teacher.phone ?? "",
       department: teacher.department,
@@ -77,7 +85,7 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
       specialization: teacher.specialization ?? "",
       joiningDate: teacher.joiningDate.slice(0, 10),
       employmentType: teacher.employmentType,
-      baseSalary: String(teacher.baseSalary),
+      baseSalary: teacher.baseSalary,
       status: teacher.status,
       // map the subject names back to ids using the options payload
       subjectIds: (options?.subjects ?? [])
@@ -85,46 +93,38 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
         .map((s) => s.id),
     })
     setError("")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teacher, options])
 
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }))
+  const set = <K extends keyof TeacherEditValues>(key: K, value: TeacherEditValues[K]) =>
+    form.setValue(key, value as never, { shouldDirty: true })
 
   const toggleSubject = (id: string) => {
-    setForm((prev) => ({
-      ...prev,
-      subjectIds: prev.subjectIds.includes(id)
-        ? prev.subjectIds.filter((s) => s !== id)
-        : [...prev.subjectIds, id],
-    }))
+    form.setValue(
+      "subjectIds",
+      subjectIds.includes(id) ? subjectIds.filter((s) => s !== id) : [...subjectIds, id],
+      { shouldDirty: true },
+    )
   }
 
-  const handleSave = async () => {
+  const handleSave = form.handleSubmit(async (data) => {
     if (!teacher) return
-    if (form.name.trim().length < 2) {
-      setError("Please enter the teacher's full name")
-      return
-    }
-    if (!form.baseSalary || Number(form.baseSalary) < 0) {
-      setError("Enter a valid base salary")
-      return
-    }
 
     setError("")
     setSaving(true)
     try {
       await updateTeacher(teacher.id, {
-        name: form.name.trim(),
-        phone: form.phone.trim() || null,
-        department: form.department.trim(),
-        designation: form.designation.trim(),
-        qualification: form.qualification.trim() || null,
-        specialization: form.specialization.trim() || null,
-        joiningDate: form.joiningDate || undefined,
-        employmentType: form.employmentType,
-        baseSalary: Number(form.baseSalary),
-        status: form.status,
-        subjectIds: form.subjectIds,
+        name: data.name.trim(),
+        phone: data.phone?.trim() || null,
+        department: data.department.trim(),
+        designation: data.designation.trim(),
+        qualification: data.qualification.trim() || null,
+        specialization: data.specialization.trim() || null,
+        joiningDate: data.joiningDate || undefined,
+        employmentType: data.employmentType,
+        baseSalary: Number(data.baseSalary),
+        status: data.status,
+        subjectIds: data.subjectIds ?? [],
       })
       refetch()
       onUpdated?.()
@@ -134,7 +134,7 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
     } finally {
       setSaving(false)
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -156,13 +156,13 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
             ))}
           </div>
         ) : (
-          <div className="space-y-6 py-2">
+          <form id="edit-teacher-form" onSubmit={handleSave} noValidate className="space-y-6 py-2">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Full Name" required>
-                <Input value={form.name} onChange={(e) => set("name", e.target.value)} />
+              <Field label="Full Name" required error={form.formState.errors.name?.message}>
+                <Input value={values.name} onChange={(e) => set("name", e.target.value)} />
               </Field>
-              <Field label="Status">
-                <Select value={form.status} onValueChange={(v) => set("status", v as StaffStatus)}>
+              <Field label="Status" error={form.formState.errors.status?.message}>
+                <Select value={values.status} onValueChange={(v) => set("status", v as StaffStatus)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -175,19 +175,19 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Phone">
-                <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+              <Field label="Phone" error={form.formState.errors.phone?.message}>
+                <Input value={values.phone} onChange={(e) => set("phone", e.target.value)} />
               </Field>
-              <Field label="Qualification">
+              <Field label="Qualification" error={form.formState.errors.qualification?.message}>
                 <Input
-                  value={form.qualification}
+                  value={values.qualification}
                   onChange={(e) => set("qualification", e.target.value)}
                 />
               </Field>
-              <Field label="Department" required>
+              <Field label="Department" required error={form.formState.errors.department?.message}>
                 <Input
                   list="edit-department-options"
-                  value={form.department}
+                  value={values.department}
                   onChange={(e) => set("department", e.target.value)}
                 />
                 <datalist id="edit-department-options">
@@ -196,10 +196,10 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
                   ))}
                 </datalist>
               </Field>
-              <Field label="Designation" required>
+              <Field label="Designation" required error={form.formState.errors.designation?.message}>
                 <Input
                   list="edit-designation-options"
-                  value={form.designation}
+                  value={values.designation}
                   onChange={(e) => set("designation", e.target.value)}
                 />
                 <datalist id="edit-designation-options">
@@ -208,22 +208,22 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
                   ))}
                 </datalist>
               </Field>
-              <Field label="Specialization" className="md:col-span-2">
+              <Field label="Specialization" className="md:col-span-2" error={form.formState.errors.specialization?.message}>
                 <Input
-                  value={form.specialization}
+                  value={values.specialization}
                   onChange={(e) => set("specialization", e.target.value)}
                 />
               </Field>
-              <Field label="Joining Date">
+              <Field label="Joining Date" error={form.formState.errors.joiningDate?.message}>
                 <Input
                   type="date"
-                  value={form.joiningDate}
+                  value={values.joiningDate}
                   onChange={(e) => set("joiningDate", e.target.value)}
                 />
               </Field>
-              <Field label="Employment Type">
+              <Field label="Employment Type" error={form.formState.errors.employmentType?.message}>
                 <Select
-                  value={form.employmentType}
+                  value={values.employmentType}
                   onValueChange={(v) => set("employmentType", v as EmploymentType)}
                 >
                   <SelectTrigger>
@@ -237,13 +237,13 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Base Salary (PKR / month)" required>
+              <Field label="Base Salary (PKR / month)" required error={form.formState.errors.baseSalary?.message}>
                 <Input
                   type="number"
                   min={0}
                   step={500}
-                  value={form.baseSalary}
-                  onChange={(e) => set("baseSalary", e.target.value)}
+                  value={values.baseSalary}
+                  onChange={(e) => set("baseSalary", Number(e.target.value))}
                 />
               </Field>
             </div>
@@ -252,7 +252,7 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
               <Label>Subjects taught</Label>
               <div className="flex flex-wrap gap-1.5 rounded-lg border border-border p-3">
                 {(options?.subjects ?? []).map((s) => {
-                  const active = form.subjectIds.includes(s.id)
+                  const active = subjectIds.includes(s.id)
                   return (
                     <button key={s.id} type="button" onClick={() => toggleSubject(s.id)}>
                       <Badge
@@ -270,7 +270,7 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
             <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
               Setting the status to Resigned or Terminated also disables the staff login.
             </p>
-          </div>
+          </form>
         )}
 
         {(error || loadError) && (
@@ -280,10 +280,10 @@ export function EditTeacherModal({ teacherId, open, onOpenChange, onUpdated }: E
         )}
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSave()} disabled={saving || isLoading || !teacher}>
+          <Button type="submit" form="edit-teacher-form" disabled={saving || isLoading || !teacher}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {saving ? "Saving…" : "Save Changes"}
           </Button>
@@ -297,11 +297,13 @@ function Field({
   label,
   required,
   className,
+  error,
   children,
 }: {
   label: string
   required?: boolean
   className?: string
+  error?: string
   children: React.ReactNode
 }) {
   return (
@@ -311,6 +313,7 @@ function Field({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }

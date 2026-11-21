@@ -244,27 +244,35 @@ export async function bulkMarkAttendance(actor: Actor, input: BulkMarkInput) {
   const duplicates = input.entries.length !== new Set(input.entries.map((e) => e.studentId)).size
   if (duplicates) throw badRequest('Duplicate students in the submission')
 
-  await prisma.$transaction(
-    input.entries.map((entry) =>
-      prisma.attendance.upsert({
-        where: { studentId_date: { studentId: entry.studentId, date } },
-        create: {
-          studentId: entry.studentId,
-          sectionId: input.sectionId,
-          date,
-          status: entry.status,
-          remarks: entry.remarks ?? null,
-          markedBy: actor.id,
-        },
-        update: {
-          status: entry.status,
-          remarks: entry.remarks ?? null,
-          sectionId: input.sectionId,
-          markedBy: actor.id,
-        },
-      }),
-    ),
-  )
+  // A 40-student class used to issue 40 separate round-trips inside one
+  // transaction. A single INSERT ... ON CONFLICT keeps it to one statement,
+  // which matters a lot when a whole school marks attendance at 08:00.
+  await prisma.$executeRaw`
+    INSERT INTO "attendance" ("id", "studentId", "sectionId", "date", "status", "remarks", "markedBy", "createdAt")
+    SELECT
+      gen_random_uuid()::text,
+      v."studentId",
+      ${input.sectionId},
+      ${date}::date,
+      v."status"::"AttendanceStatus",
+      v."remarks",
+      ${actor.id},
+      NOW()
+    FROM (
+      VALUES ${Prisma.join(
+        input.entries.map((entry) => Prisma.sql`(
+          ${entry.studentId}::text,
+          ${entry.status}::text,
+          ${entry.remarks ?? null}::text
+        )`),
+      )}
+    ) AS v("studentId", "status", "remarks")
+    ON CONFLICT ("studentId", "date") DO UPDATE SET
+      "status"    = EXCLUDED."status",
+      "remarks"   = EXCLUDED."remarks",
+      "sectionId" = EXCLUDED."sectionId",
+      "markedBy"  = EXCLUDED."markedBy"
+  `
 
   const summary = input.entries.reduce<Record<string, number>>((acc, e) => {
     acc[e.status] = (acc[e.status] ?? 0) + 1

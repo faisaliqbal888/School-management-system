@@ -97,6 +97,19 @@ Authorization: Bearer <accessToken>
 
 A cookie named `access_token` is accepted as a fallback.
 
+### CSRF protection
+
+Cookie-authenticated writes are protected against cross-site request forgery using the
+double-submit pattern:
+
+1. `GET /api/v1/csrf` returns `{ csrfToken }` and sets a **readable** `csrf_token` cookie.
+2. Echo the value in an `X-CSRF-Token` header on every `POST`, `PATCH`, `PUT` and `DELETE`.
+
+Requests authenticated with `Authorization: Bearer …` are exempt (no ambient cookie), and so are
+requests that carry no `refresh_token` cookie at all. A cookie-auth write without a matching header
+is rejected with `403 CSRF_TOKEN_INVALID`. The bundled frontend does this automatically in
+`lib/api-client.ts`.
+
 | Role | Access |
 |---|---|
 | `ADMIN` | everything |
@@ -258,6 +271,33 @@ Audiences: `ALL · ADMINS · TEACHERS · STUDENTS · PARENTS · CLASS`. Read sta
 (`notification_reads`), so a broadcast stays unread until each account opens it. Teachers may
 target `STUDENTS`, `PARENTS` or one of their own classes — never `ALL` or another class.
 
+### Outbound email & SMS
+
+`POST /notifications` accepts `channel: IN_APP | EMAIL | SMS`. The in-app row is always written
+first, then delivery is attempted, so a provider outage can never lose the notice.
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cm…",
+    "delivery": { "attempted": 214, "sent": 211, "failed": 3, "channels": ["EMAIL"] }
+  }
+}
+```
+
+- Recipients for **EMAIL** are the active accounts in the audience (class-scoped for `CLASS`).
+- Recipients for **SMS** are guardian phone numbers — parents are who a school texts. A guardian
+  with two children in the same class is messaged once.
+- Delivery is **off unless configured** (`DELIVERY_ENABLED=true` plus `EMAIL_API_URL` /
+  `SMS_API_URL`). While off, the notice is saved and `delivery.attempted` is `0`.
+- Sends run with a 10 s timeout and 5-way concurrency; individual failures are logged and counted,
+  never thrown into the request.
+
+Supported transport shapes (see `backend/.env.example`): `EMAIL_PROVIDER=generic` posts
+`{from,to,subject,text}` / `{to,message}` with a bearer token to your URL; `EMAIL_PROVIDER=resend`
+uses Resend's email schema.
+
 ---
 
 ## Dashboards
@@ -324,6 +364,34 @@ catalogue stays consistent without a separate stock table.
 
 ---
 
+## Account & security
+
+Available to every authenticated role — a user always acts on **their own** account.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/auth/sessions` | Active refresh tokens: `id`, `userAgent`, `ipAddress`, `createdAt`, `expiresAt` |
+| DELETE | `/auth/sessions/:id` | Revoke one of *your own* sessions (someone else's returns 400) |
+| DELETE | `/auth/sessions` | Revoke every session except the current one → `{ revoked }` |
+| PATCH | `/auth/profile` | `{ name?, phone?, avatarUrl? }` — role and email are **not** accepted |
+| POST | `/auth/change-password` | `{ currentPassword, newPassword, confirmPassword }`, revokes all sessions |
+
+### Password policy
+
+New passwords must be 10–128 characters and contain an uppercase letter, a lowercase letter and a
+digit. Common passwords (`password123`, `qwerty123`, `admin123`, …), single repeated characters and
+starting sequences such as `1234` / `qwer` are rejected. The same rule applies to change-password,
+student and teacher creation, and admin-created accounts. Violations return `400 VALIDATION_ERROR`.
+
+### Brute-force lockout
+
+Five consecutive failures lock the account for 15 minutes (`users.lockedUntil`). The response stays
+`401` but switches to *"Too many failed attempts…"*, and an `auth.lockout` audit entry is written.
+A successful sign-in clears the counter. Unknown emails are verified against a dummy hash so timing
+does not reveal whether an account exists.
+
+---
+
 ## Administration — users, settings and alerts
 
 `ADMIN` only; every other role receives `403`.
@@ -338,6 +406,7 @@ catalogue stays consistent without a separate stock table.
 | GET | `/admin/settings` | Ten known keys, each with `source: database \| default` |
 | PATCH | `/admin/settings` | `{ updates: [{ key, value }] }` — unknown keys reject the whole batch |
 | GET | `/admin/alerts` | Alerts derived on read from fees, attendance, library, inventory, HR |
+| GET | `/admin/audit-logs` | Immutable audit trail — `page`, `limit`, `action`, `userId`, `from`, `to` |
 
 Suspending an account blocks sign-in immediately. Alerts are **not stored** — each one is a live
 query, so fixing the underlying record clears the alert on the next refresh.
@@ -377,6 +446,18 @@ Staff ── Payroll / LeaveRequest           Notification / AuditLog / RefreshT
 Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE`.
 
 ---
+
+## Testing
+
+```
+npm test                 # backend (needs DATABASE_URL + migrated schema) then frontend
+npm run test:backend
+npm run test:frontend
+```
+
+Backend suites hit a real Postgres through supertest; frontend suites are DOM-free Vitest checks of
+`lib/validation/schemas.ts` and `lib/api-client.ts` (CSRF header, one-shot refresh on 401, error
+envelope). CI runs both.
 
 ## Roadmap for the API surface
 

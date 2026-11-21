@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import {
+  ShieldCheck,
   LayoutDashboard,
   Users,
   GraduationCap,
@@ -61,7 +62,9 @@ const navigation = [
 
 const bottomNavigation = [
   { name: "Alerts", href: "/admin/alerts", icon: Bell },
+  { name: "Audit log", href: "/admin/audit-logs", icon: ShieldCheck },
   { name: "Settings", href: "/admin/settings", icon: Settings },
+  { name: "Security", href: "/account/security", icon: ShieldCheck },
 ]
 
 export function AdminSidebar() {

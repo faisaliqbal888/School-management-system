@@ -6,6 +6,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  ShieldCheck,
   LayoutDashboard,
   Users,
   ClipboardCheck,
@@ -37,7 +38,10 @@ const navigation = [
   { name: "Fees", href: "/parent/fees", icon: CreditCard },
 ]
 
-const bottomNavigation = [{ name: "Notifications", href: "/parent/notifications", icon: Bell }]
+const bottomNavigation = [
+  { name: "Notifications", href: "/parent/notifications", icon: Bell },
+  { name: "Security", href: "/account/security", icon: ShieldCheck },
+]
 
 export function ParentSidebar() {
   const [collapsed, setCollapsed] = useState(false)

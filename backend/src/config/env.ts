@@ -22,6 +22,20 @@ const schema = z.object({
   CORS_ORIGINS: z.string().default('http://localhost:3000'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+
+  // ── outbound email / SMS ──────────────────────────────────
+  // Disabled unless DELIVERY_ENABLED=true, so a local checkout never sends
+  // anything by accident even if a URL is left in the environment.
+  DELIVERY_ENABLED: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
+  EMAIL_PROVIDER: z.enum(['generic', 'resend']).default('generic'),
+  EMAIL_API_URL: z.string().url().optional(),
+  EMAIL_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('no-reply@school.local'),
+  SMS_API_URL: z.string().url().optional(),
+  SMS_API_KEY: z.string().optional(),
 })
 
 const parsed = schema.safeParse(process.env)
@@ -55,6 +69,14 @@ export const config = {
   rateLimit: {
     windowMs: env.RATE_LIMIT_WINDOW_MS,
     max: env.RATE_LIMIT_MAX,
+  },
+  delivery: {
+    enabled: env.DELIVERY_ENABLED,
+    emailProvider: env.EMAIL_PROVIDER,
+    emailUrl: env.EMAIL_API_URL,
+    smsUrl: env.SMS_API_URL,
+    apiKey: env.EMAIL_API_KEY ?? env.SMS_API_KEY,
+    fromEmail: env.EMAIL_FROM,
   },
 } as const
 

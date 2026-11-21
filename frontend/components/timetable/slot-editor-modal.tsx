@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -12,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Loader2 } from "lucide-react"
 import {
   dayLabel,
@@ -21,6 +24,7 @@ import {
   type DayOfWeek,
   type SlotRow,
 } from "@/lib/hooks/use-timetable"
+import { slotSchema, type SlotValues } from "@/lib/validation/schemas"
 
 const DAYS: DayOfWeek[] = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"]
 const selectClass =
@@ -49,60 +53,58 @@ const addMinutes = (time: string, minutes: number) => {
   return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`
 }
 
+function valuesFrom(draft: SlotDraft | null): SlotValues {
+  const existing = draft?.slot
+  const start = existing?.startTime ?? draft?.startTime ?? "08:00"
+  return {
+    classId: existing?.classId ?? draft?.classId ?? "",
+    sectionId: existing?.sectionId ?? draft?.sectionId ?? "",
+    subjectId: existing?.subjectId ?? "",
+    teacherId: existing?.teacherId ?? "",
+    dayOfWeek: (existing?.dayOfWeek ?? (draft?.day as DayOfWeek) ?? "MONDAY") as DayOfWeek,
+    startTime: start,
+    endTime: existing?.endTime ?? draft?.endTime ?? addMinutes(start, 45),
+    roomNo: existing?.roomNo ?? "",
+  }
+}
+
 export function SlotEditorModal({ open, draft, onClose, onSaved }: Props) {
   const { options } = useTimetableOptions(open)
   const { createSlot, updateSlot, isPending: busy } = useSlotActions(onSaved)
 
   const existing = draft?.slot
-  const [classId, setClassId] = useState("")
-  const [sectionId, setSectionId] = useState("")
-  const [subjectId, setSubjectId] = useState("")
-  const [teacherId, setTeacherId] = useState("")
-  const [day, setDay] = useState<DayOfWeek>("MONDAY")
-  const [startTime, setStartTime] = useState("08:00")
-  const [endTime, setEndTime] = useState("08:45")
-  const [roomNo, setRoomNo] = useState("")
-  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!open) return
-    setError(null)
-    setClassId(existing?.classId ?? draft?.classId ?? "")
-    setSectionId(existing?.sectionId ?? draft?.sectionId ?? "")
-    setSubjectId(existing?.subjectId ?? "")
-    setTeacherId(existing?.teacherId ?? "")
-    setDay((existing?.dayOfWeek ?? (draft?.day as DayOfWeek) ?? "MONDAY") as DayOfWeek)
-    setStartTime(existing?.startTime ?? draft?.startTime ?? "08:00")
-    setEndTime(existing?.endTime ?? draft?.endTime ?? addMinutes(draft?.startTime ?? "08:00", 45))
-    setRoomNo(existing?.roomNo ?? "")
-  }, [open, draft, existing])
+  const form = useForm<SlotValues>({
+    resolver: zodResolver(slotSchema),
+    defaultValues: valuesFrom(draft),
+  })
 
+  const classId = form.watch("classId")
   const sections = options?.classes.find((c) => c.id === classId)?.sections ?? []
   const subjects = options?.subjects.filter((s) => s.classId === classId) ?? []
 
+  useEffect(() => {
+    if (open) form.reset(valuesFrom(draft))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, draft])
+
   const handleClass = (next: string) => {
-    setClassId(next)
+    form.setValue("classId", next)
     const nextSections = options?.classes.find((c) => c.id === next)?.sections ?? []
-    setSectionId(nextSections[0]?.id ?? "")
-    setSubjectId("")
+    form.setValue("sectionId", nextSections[0]?.id ?? "")
+    form.setValue("subjectId", "")
   }
 
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault()
-    setError(null)
-
-    if (!classId) return setError("Choose a class")
-    if (!subjectId) return setError("Choose a subject")
-
+  const submit = form.handleSubmit(async (values) => {
     const payload: CreateSlotInput = {
-      classId,
-      sectionId: sectionId || null,
-      subjectId,
-      teacherId: teacherId || null,
-      dayOfWeek: day,
-      startTime,
-      endTime,
-      roomNo: roomNo.trim() || null,
+      classId: values.classId,
+      sectionId: values.sectionId || null,
+      subjectId: values.subjectId,
+      teacherId: values.teacherId || null,
+      dayOfWeek: values.dayOfWeek,
+      startTime: values.startTime,
+      endTime: values.endTime,
+      roomNo: values.roomNo.trim() || null,
     }
 
     try {
@@ -110,12 +112,13 @@ export function SlotEditorModal({ open, draft, onClose, onSaved }: Props) {
       else await createSlot(payload)
       onClose()
     } catch (err) {
-      const message =
-        (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message ??
-        "Could not save this slot"
-      setError(message)
+      form.setError("root", {
+        message:
+          (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error
+            ?.message ?? "Could not save this slot",
+      })
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -129,121 +132,142 @@ export function SlotEditorModal({ open, draft, onClose, onSaved }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="space-y-3" noValidate>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-class">Class</Label>
-              <select
-                id="slot-class"
-                className={selectClass}
-                value={classId}
-                onChange={(e) => handleClass(e.target.value)}
-              >
-                <option value="">Select class</option>
-                {options?.classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormField
+              control={form.control}
+              name="classId"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Class</Label>
+                  <select className={selectClass} {...field} onChange={(e) => handleClass(e.target.value)}>
+                    <option value="">Select class</option>
+                    {options?.classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-section">Section</Label>
-              <select
-                id="slot-section"
-                className={selectClass}
-                value={sectionId}
-                onChange={(e) => setSectionId(e.target.value)}
-              >
-                <option value="">Whole class</option>
-                {sections.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormField
+              control={form.control}
+              name="sectionId"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Section</Label>
+                  <select className={selectClass} {...field}>
+                    <option value="">Whole class</option>
+                    {sections.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-subject">Subject</Label>
-              <select
-                id="slot-subject"
-                className={selectClass}
-                value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
-              >
-                <option value="">Select subject</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormField
+              control={form.control}
+              name="subjectId"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Subject</Label>
+                  <select className={selectClass} {...field}>
+                    <option value="">Select subject</option>
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-teacher">Teacher</Label>
-              <select
-                id="slot-teacher"
-                className={selectClass}
-                value={teacherId}
-                onChange={(e) => setTeacherId(e.target.value)}
-              >
-                <option value="">Unassigned</option>
-                {options?.teachers.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormField
+              control={form.control}
+              name="teacherId"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Teacher</Label>
+                  <select className={selectClass} {...field}>
+                    <option value="">Unassigned</option>
+                    {options?.teachers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-day">Day</Label>
-              <select
-                id="slot-day"
-                className={selectClass}
-                value={day}
-                onChange={(e) => setDay(e.target.value as DayOfWeek)}
-              >
-                {DAYS.map((d) => (
-                  <option key={d} value={d}>
-                    {dayLabel(d)}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <FormField
+              control={form.control}
+              name="dayOfWeek"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Day</Label>
+                  <select className={selectClass} {...field}>
+                    {DAYS.map((d) => (
+                      <option key={d} value={d}>
+                        {dayLabel(d)}
+                      </option>
+                    ))}
+                  </select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-room">Room</Label>
-              <Input
-                id="slot-room"
-                value={roomNo}
-                placeholder="e.g. 10A"
-                onChange={(e) => setRoomNo(e.target.value)}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="roomNo"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Room</Label>
+                  <Input placeholder="e.g. 10A" {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-start">Start</Label>
-              <Input
-                id="slot-start"
-                type="time"
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="startTime"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Start</Label>
+                  <Input type="time" {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            <div className="space-y-1.5">
-              <Label htmlFor="slot-end">End</Label>
-              <Input id="slot-end" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
-            </div>
+            <FormField
+              control={form.control}
+              name="endTime"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>End</Label>
+                  <Input type="time" {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
-          {error && (
+          {form.formState.errors.root && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
-              {error}
+              {form.formState.errors.root.message}
             </p>
           )}
 

@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -20,12 +22,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { Loader2, ReceiptText } from "lucide-react"
 import { formatPKR } from "@/lib/format"
 import { useCreateInvoice, useFeeStructures, currentPeriod } from "@/lib/hooks/use-fees"
 import { useStudents } from "@/lib/hooks/use-students"
+import { invoiceSchema, type InvoiceValues } from "@/lib/validation/schemas"
 
 interface CreateInvoiceModalProps {
   open: boolean
@@ -45,85 +49,88 @@ export function CreateInvoiceModal({
   const { students, isLoading: studentsLoading } = useStudents({ limit: 100, page: 1 })
   const { structures } = useFeeStructures(open)
 
-  const [studentId, setStudentId] = useState("")
   const [structureId, setStructureId] = useState("")
-  const [title, setTitle] = useState("")
-  const [amount, setAmount] = useState("")
-  const [discount, setDiscount] = useState("0")
-  const [fine, setFine] = useState("0")
-  const [dueDate, setDueDate] = useState(() => {
+  const [saving, setSaving] = useState(false)
+
+  const inTenDays = () => {
     const d = new Date()
     d.setDate(d.getDate() + 10)
     return d.toISOString().slice(0, 10)
+  }
+
+  const emptyValues = (): InvoiceValues => ({
+    studentId: presetStudentId ?? "",
+    title: "",
+    amount: 0,
+    discount: 0,
+    fine: 0,
+    dueDate: inTenDays(),
+    period: currentPeriod(),
+    notes: "",
+    feeStructureId: "",
   })
-  const [period, setPeriod] = useState(currentPeriod())
-  const [notes, setNotes] = useState("")
-  const [error, setError] = useState("")
-  const [saving, setSaving] = useState(false)
+
+  const form = useForm<InvoiceValues>({
+    resolver: zodResolver(invoiceSchema),
+    defaultValues: emptyValues(),
+  })
+
+  const [amount, discount, fine, period] = form.watch(["amount", "discount", "fine", "period"])
 
   useEffect(() => {
     if (!open) return
-    setStudentId(presetStudentId ?? "")
     setStructureId("")
-    setTitle("")
-    setAmount("")
-    setDiscount("0")
-    setFine("0")
-    setPeriod(currentPeriod())
-    setNotes("")
-    setError("")
+    form.reset(emptyValues())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, presetStudentId])
 
-  // selecting a structure pre-fills title + amount
+  // selecting a structure pre-fills title + amount + due date
   useEffect(() => {
     if (!structureId) return
     const structure = structures.find((s) => s.id === structureId)
     if (structure) {
-      setTitle(structure.name)
-      setAmount(String(structure.amount))
+      form.setValue("title", structure.name)
+      form.setValue("amount", structure.amount, { shouldValidate: true })
+      form.setValue("feeStructureId", structure.id)
       const day = Math.min(structure.dueDay, 28)
       const [y, m] = period.split("-").map(Number)
-      setDueDate(new Date(Date.UTC(y!, m! - 1, day)).toISOString().slice(0, 10))
+      form.setValue("dueDate", new Date(Date.UTC(y!, m! - 1, day)).toISOString().slice(0, 10))
     }
-  }, [structureId, structures]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [structureId, structures])
 
-  const total = useMemo(() => {
-    const base = Number(amount) || 0
-    return base - (Number(discount) || 0) + (Number(fine) || 0)
-  }, [amount, discount, fine])
+  const total = useMemo(
+    () => (Number(amount) || 0) - (Number(discount) || 0) + (Number(fine) || 0),
+    [amount, discount, fine],
+  )
 
-  const handleSubmit = async () => {
-    if (!studentId) return setError("Please choose a student")
-    if (!title.trim()) return setError("Please enter an invoice title")
-    if (!(Number(amount) > 0)) return setError("Amount must be greater than zero")
-    if (Number(discount) > Number(amount)) return setError("Discount cannot exceed the amount")
-    if (total <= 0) return setError("Invoice total must be greater than zero")
-
-    setError("")
+  const handleSubmit = form.handleSubmit(async (values) => {
     setSaving(true)
     try {
       const res = await createInvoice({
-        studentId,
-        title: title.trim(),
-        amount: Number(amount),
-        discount: Number(discount) || 0,
-        fine: Number(fine) || 0,
-        dueDate,
-        period: period || null,
-        notes: notes.trim() || null,
+        studentId: values.studentId,
+        title: values.title,
+        amount: values.amount,
+        discount: values.discount || 0,
+        fine: values.fine || 0,
+        dueDate: values.dueDate,
+        period: values.period || null,
+        notes: values.notes.trim() || null,
         feeStructureId: structureId || null,
       })
       toast.success(`Invoice ${res.invoiceNo} created`, {
-        description: `${formatPKR(res.totalAmount)} due · ${period}`,
+        description: `${formatPKR(res.totalAmount)} due · ${values.period}`,
       })
       onCreated?.()
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create the invoice")
+      form.setError("root", {
+        message: err instanceof Error ? err.message : "Could not create the invoice",
+      })
     } finally {
       setSaving(false)
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -142,23 +149,30 @@ export function CreateInvoiceModal({
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Student</Label>
-            <Select value={studentId} onValueChange={setStudentId} disabled={studentsLoading}>
-              <SelectTrigger>
-                <SelectValue placeholder={studentsLoading ? "Loading…" : "Choose a student"} />
-              </SelectTrigger>
-              <SelectContent>
-                {students.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name} · {s.admissionNo}
-                    {s.className ? ` · ${s.className}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <FormField
+            control={form.control}
+            name="studentId"
+            render={({ field }) => (
+              <FormItem>
+                <Label>Student</Label>
+                <Select value={field.value} onValueChange={field.onChange} disabled={studentsLoading}>
+                  <SelectTrigger>
+                    <SelectValue placeholder={studentsLoading ? "Loading…" : "Choose a student"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {students.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name} · {s.admissionNo}
+                        {s.className ? ` · ${s.className}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <div className="space-y-2">
             <Label>Fee structure (optional)</Label>
@@ -176,56 +190,87 @@ export function CreateInvoiceModal({
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label>Title</Label>
-            <Input
-              placeholder="e.g. Tuition Fee — November"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
+          <FormField
+            control={form.control}
+            name="title"
+            render={({ field }) => (
+              <FormItem>
+                <Label>Title</Label>
+                <Input placeholder="e.g. Tuition Fee — November" {...field} />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Amount (PKR)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Period</Label>
-              <Input type="month" value={period} onChange={(e) => setPeriod(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Discount (PKR)</Label>
-              <Input
-                type="number"
-                min={0}
-                value={discount}
-                onChange={(e) => setDiscount(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Fine (PKR)</Label>
-              <Input type="number" min={0} value={fine} onChange={(e) => setFine(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Due date</Label>
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Notes (optional)</Label>
-            <Input
-              placeholder="Anything the accounts team should know"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+            <FormField
+              control={form.control}
+              name="amount"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Amount (PKR)</Label>
+                  <Input type="number" min={0} {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="period"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Period</Label>
+                  <Input type="month" {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="discount"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Discount (PKR)</Label>
+                  <Input type="number" min={0} {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="fine"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Fine (PKR)</Label>
+                  <Input type="number" min={0} {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="dueDate"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Due date</Label>
+                  <Input type="date" {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name="notes"
+            render={({ field }) => (
+              <FormItem>
+                <Label>Notes (optional)</Label>
+                <Input placeholder="Anything the accounts team should know" {...field} />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <Separator />
 
@@ -234,22 +279,23 @@ export function CreateInvoiceModal({
             <span className="text-lg font-bold">{formatPKR(total)}</span>
           </div>
 
-          {error && (
+          {form.formState.errors.root && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
             </Alert>
           )}
-        </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleSubmit()} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {saving ? "Creating…" : "Create Invoice"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saving ? "Creating…" : "Create Invoice"}
+            </Button>
+          </DialogFooter>
+        </form>
+
       </DialogContent>
     </Dialog>
   )

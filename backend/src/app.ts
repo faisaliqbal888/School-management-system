@@ -8,6 +8,7 @@ import morgan from 'morgan'
 import { config } from './config/env.js'
 import { globalLimiter } from './middleware/rate-limit.js'
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js'
+import { csrfProtection, issueCsrfToken } from './middleware/csrf.js'
 import { healthRouter } from './routes/health.routes.js'
 import { apiRouter } from './routes/index.js'
 
@@ -38,6 +39,26 @@ export function createApp(): Express {
   app.use(express.json({ limit: '1mb' }))
   app.use(express.urlencoded({ extended: true, limit: '1mb' }))
   app.use(cookieParser())
+
+  // Defence in depth for the cookie-authenticated API.
+  app.use(csrfProtection)
+
+  // Responses that carry a session must not be cached by a proxy; everything
+  // else stays cacheable so read-heavy lists stay fast for many users.
+  app.use((req, res, next) => {
+    if (req.cookies?.refresh_token || req.get('authorization')) {
+      res.setHeader('Cache-Control', 'no-store')
+    }
+    res.setHeader('X-Content-Type-Options', 'nosniff')
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()')
+    next()
+  })
+
+  // Hands the SPA a CSRF token before it makes its first write.
+  app.get(`${config.apiPrefix}/csrf`, (req, res) => {
+    res.json({ success: true, data: { csrfToken: issueCsrfToken(req, res) } })
+  })
 
   if (!config.isTest) {
     app.use(morgan(config.isProd ? 'combined' : 'dev'))

@@ -76,7 +76,7 @@ describe('admin: directory', () => {
     const res = await request(app)
       .post('/api/v1/admin/users')
       .set(auth(adminToken))
-      .send({ name: 'New Person', email, password: 'Password123', role: 'STUDENT' })
+      .send({ name: 'New Person', email, password: 'NewPerson2026x', role: 'STUDENT' })
 
     expect(res.status).toBe(201)
     expect(res.body.data.role).toBe('STUDENT')
@@ -85,7 +85,7 @@ describe('admin: directory', () => {
     const duplicate = await request(app)
       .post('/api/v1/admin/users')
       .set(auth(adminToken))
-      .send({ name: 'New Person', email, password: 'Password123', role: 'STUDENT' })
+      .send({ name: 'New Person', email, password: 'NewPerson2026x', role: 'STUDENT' })
     expect(duplicate.status).toBe(400)
   })
 
@@ -107,7 +107,7 @@ describe('admin: directory', () => {
 
     const blocked = await request(app)
       .post('/api/v1/auth/login')
-      .send({ email: `new-${suffix}@test.pk`, password: 'Password123' })
+      .send({ email: `new-${suffix}@test.pk`, password: 'NewPerson2026x' })
     expect(blocked.status).toBeGreaterThanOrEqual(400)
 
     const reactivate = await request(app)
