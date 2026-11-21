@@ -17,7 +17,6 @@ const suffix = Date.now().toString().slice(-6)
 const PASSWORD = 'TestPass123'
 
 let token = ''
-let adminId = ''
 
 const emails = [`imp1-${suffix}@test.pk`, `imp2-${suffix}@test.pk`]
 
@@ -26,7 +25,7 @@ function auth() {
 }
 
 beforeAll(async () => {
-  const admin = await prisma.user.create({
+  await prisma.user.create({
     data: {
       email: `imp-admin-${suffix}@test.pk`,
       passwordHash: await hashPassword(PASSWORD),
@@ -34,8 +33,8 @@ beforeAll(async () => {
       name: 'Import Admin',
     },
   })
-  adminId = admin.id
-  const login = await request(app).post('/api/v1/auth/login').send({ email: admin.email, password: PASSWORD })
+  const adminEmail = `imp-admin-${suffix}@test.pk`
+  const login = await request(app).post('/api/v1/auth/login').send({ email: adminEmail, password: PASSWORD })
   token = login.body.data.accessToken
 })
 
