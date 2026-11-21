@@ -32,6 +32,91 @@ const returnBody = z.object({ fine: z.coerce.number().min(0).optional() })
 
 const idParam = z.object({ id: z.string().min(1) })
 
+// ── transport ────────────────────────────────────────────────
+const VEHICLE_STATUS = ['ACTIVE', 'MAINTENANCE', 'OUT_OF_SERVICE'] as const
+
+const vehicleBody = z.object({
+  registrationNo: z.string().trim().min(2, 'Registration is required').max(20),
+  model: z.string().trim().min(1, 'Model is required').max(60),
+  capacity: z.coerce.number().int().min(1, 'At least one seat').max(120),
+  driverName: z.string().trim().min(2, 'Driver name is required').max(80),
+  driverPhone: z.string().trim().min(7, 'Driver phone is required').max(20),
+  conductorName: z.string().trim().max(80).nullish(),
+  status: z.enum(VEHICLE_STATUS).optional(),
+  lastServiceAt: z.string().nullish(),
+})
+
+const vehiclePatch = vehicleBody.partial()
+
+const routeBody = z.object({
+  name: z.string().trim().min(3, 'Route name is required').max(80),
+  startPoint: z.string().trim().min(1, 'Start point is required').max(80),
+  endPoint: z.string().trim().min(1, 'End point is required').max(80),
+  distanceKm: z.coerce.number().min(0).max(500).optional(),
+  monthlyFee: z.coerce.number().min(0).max(1_000_000).optional(),
+  vehicleId: z.string().nullish(),
+  isActive: z.boolean().optional(),
+})
+
+const routePatch = routeBody.partial()
+
+const assignBody = z.object({
+  studentId: z.string().min(1, 'Choose a learner'),
+  stopName: z.string().trim().max(80).nullish(),
+})
+
+// ── hostel ───────────────────────────────────────────────────
+const ROOM_TYPE = ['SINGLE', 'DOUBLE', 'TRIPLE', 'DORMITORY'] as const
+const ROOM_STATUS = ['AVAILABLE', 'FULL', 'MAINTENANCE'] as const
+
+const roomBody = z.object({
+  block: z.string().trim().min(1, 'Block is required').max(20),
+  roomNo: z.string().trim().min(1, 'Room number is required').max(20),
+  type: z.enum(ROOM_TYPE).optional(),
+  capacity: z.coerce.number().int().min(1).max(40),
+  monthlyFee: z.coerce.number().min(0).max(1_000_000).optional(),
+  status: z.enum(ROOM_STATUS).optional(),
+})
+
+const roomPatch = roomBody.partial()
+const allocateBody = z.object({ studentId: z.string().min(1, 'Choose a learner') })
+
+// ── inventory ────────────────────────────────────────────────
+const CONDITION = ['NEW', 'GOOD', 'FAIR', 'POOR', 'DAMAGED'] as const
+
+const itemBody = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(120),
+  code: z.string().trim().min(1, 'Code is required').max(40),
+  category: z.string().trim().min(1, 'Category is required').max(60),
+  quantity: z.coerce.number().int().min(0).optional(),
+  minQuantity: z.coerce.number().int().min(0).optional(),
+  unitPrice: z.coerce.number().min(0).optional(),
+  location: z.string().trim().max(80).nullish(),
+  supplier: z.string().trim().max(120).nullish(),
+  condition: z.enum(CONDITION).optional(),
+  purchasedAt: z.string().nullish(),
+})
+
+const itemPatch = itemBody.partial()
+
+const adjustBody = z.object({
+  delta: z.coerce.number().int().refine((v) => v !== 0, 'Enter a non-zero change'),
+  reason: z.string().trim().min(3, 'Give a reason for the adjustment').max(200),
+})
+
+// ── HR ───────────────────────────────────────────────────────
+const periodBody = z.object({ period: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Use 2026-01') })
+
+const leaveBody = z.object({
+  teacherId: z.string().nullish(),
+  staffId: z.string().nullish(),
+  fromDate: z.string().min(8, 'Choose a start date'),
+  toDate: z.string().min(8, 'Choose an end date'),
+  reason: z.string().trim().min(3, 'Give a reason').max(300),
+})
+
+const decisionBody = z.object({ decision: z.enum(['APPROVED', 'REJECTED']) })
+
 // ── Library ──────────────────────────────────────────────────
 operationsRouter.get(
   '/library/overview',
@@ -154,5 +239,231 @@ operationsRouter.get(
   authorize('ADMIN', 'TEACHER'),
   asyncHandler(async (req, res) => {
     ok(res, await ops.inventoryOverview(actorOf(req)))
+  }),
+)
+
+// ═════════════════════════════════════════════════════════════
+//  TRANSPORT — write paths (ADMIN)
+// ═════════════════════════════════════════════════════════════
+
+operationsRouter.post(
+  '/transport/vehicles',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: vehicleBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.createVehicle(actorOf(req), req.body))
+  }),
+)
+
+operationsRouter.patch(
+  '/transport/vehicles/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: vehiclePatch }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.updateVehicle(actorOf(req), String(req.params.id), req.body))
+  }),
+)
+
+operationsRouter.delete(
+  '/transport/vehicles/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.deleteVehicle(actorOf(req), String(req.params.id)))
+  }),
+)
+
+operationsRouter.post(
+  '/transport/routes',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: routeBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.createRoute(actorOf(req), req.body))
+  }),
+)
+
+operationsRouter.patch(
+  '/transport/routes/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: routePatch }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.updateRoute(actorOf(req), String(req.params.id), req.body))
+  }),
+)
+
+operationsRouter.delete(
+  '/transport/routes/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.deleteRoute(actorOf(req), String(req.params.id)))
+  }),
+)
+
+operationsRouter.post(
+  '/transport/routes/:id/riders',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: assignBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.assignStudentToRoute(actorOf(req), String(req.params.id), req.body))
+  }),
+)
+
+operationsRouter.delete(
+  '/transport/riders/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.removeStudentFromRoute(actorOf(req), String(req.params.id)))
+  }),
+)
+
+// ═════════════════════════════════════════════════════════════
+//  HOSTEL — write paths (ADMIN)
+// ═════════════════════════════════════════════════════════════
+
+operationsRouter.post(
+  '/hostel/rooms',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: roomBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.createRoom(actorOf(req), req.body))
+  }),
+)
+
+operationsRouter.patch(
+  '/hostel/rooms/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: roomPatch }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.updateRoom(actorOf(req), String(req.params.id), req.body))
+  }),
+)
+
+operationsRouter.delete(
+  '/hostel/rooms/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.deleteRoom(actorOf(req), String(req.params.id)))
+  }),
+)
+
+operationsRouter.post(
+  '/hostel/rooms/:id/allocate',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: allocateBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.allocateRoom(actorOf(req), String(req.params.id), req.body.studentId))
+  }),
+)
+
+operationsRouter.post(
+  '/hostel/allocations/:id/vacate',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.vacateRoom(actorOf(req), String(req.params.id)))
+  }),
+)
+
+// ═════════════════════════════════════════════════════════════
+//  INVENTORY — write paths (ADMIN)
+// ═════════════════════════════════════════════════════════════
+
+operationsRouter.post(
+  '/inventory/items',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: itemBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.createItem(actorOf(req), req.body))
+  }),
+)
+
+operationsRouter.patch(
+  '/inventory/items/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: itemPatch }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.updateItem(actorOf(req), String(req.params.id), req.body))
+  }),
+)
+
+operationsRouter.delete(
+  '/inventory/items/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.deleteItem(actorOf(req), String(req.params.id)))
+  }),
+)
+
+operationsRouter.post(
+  '/inventory/items/:id/adjust',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: adjustBody }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.adjustStock(actorOf(req), String(req.params.id), req.body))
+  }),
+)
+
+// ═════════════════════════════════════════════════════════════
+//  HR — payroll runs + leave workflow (ADMIN)
+// ═════════════════════════════════════════════════════════════
+
+operationsRouter.post(
+  '/hr/payroll/run',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: periodBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.runPayroll(actorOf(req), req.body.period))
+  }),
+)
+
+operationsRouter.post(
+  '/hr/payroll/pay',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: periodBody }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.markPayrollPaid(actorOf(req), req.body.period))
+  }),
+)
+
+operationsRouter.post(
+  '/hr/leaves',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: leaveBody }),
+  asyncHandler(async (req, res) => {
+    created(res, await ops.createLeaveRequest(actorOf(req), req.body))
+  }),
+)
+
+operationsRouter.patch(
+  '/hr/leaves/:id',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ params: idParam, body: decisionBody }),
+  asyncHandler(async (req, res) => {
+    ok(res, await ops.decideLeave(actorOf(req), String(req.params.id), req.body.decision))
   }),
 )
