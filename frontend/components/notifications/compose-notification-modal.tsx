@@ -20,6 +20,7 @@ import {
   useComposerOptions,
   useCreateNotification,
 } from "@/lib/hooks/use-notifications"
+import { toast } from "sonner"
 import { noticeSchema, type NoticeValues } from "@/lib/validation/schemas"
 
 const selectClass =
@@ -42,7 +43,7 @@ export function ComposeNotificationModal({ open, onClose, onSent }: Props) {
 
   const form = useForm<NoticeValues>({
     resolver: zodResolver(noticeSchema),
-    defaultValues: { title: "", body: "", audience: "ALL", classId: "" },
+    defaultValues: { title: "", body: "", audience: "ALL", channel: "IN_APP", classId: "" },
   })
 
   const audience = form.watch("audience")
@@ -54,6 +55,7 @@ export function ComposeNotificationModal({ open, onClose, onSent }: Props) {
       title: "",
       body: "",
       audience: audiences[0] ?? "ALL",
+      channel: "IN_APP",
       classId: classes[0]?.id ?? "",
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,12 +63,28 @@ export function ComposeNotificationModal({ open, onClose, onSent }: Props) {
 
   const submit = form.handleSubmit(async (values) => {
     try {
-      await create.mutate({
+      const result = await create.mutate({
         title: values.title,
         body: values.body,
         audience: values.audience,
+        channel: values.channel,
         classId: values.audience === "CLASS" ? values.classId : null,
       })
+
+      const delivery = result?.delivery
+      if (values.channel !== "IN_APP") {
+        if (!delivery || delivery.attempted === 0) {
+          toast.warning("Notice saved in-app only", {
+            description:
+              "Outbound email/SMS is not configured on this server. Ask an administrator to enable it.",
+          })
+        } else {
+          toast.success(`Notice sent · ${delivery.sent} via ${values.channel.toLowerCase()}`, {
+            description: delivery.failed > 0 ? `${delivery.failed} could not be delivered` : undefined,
+          })
+        }
+      }
+
       onSent?.()
       onClose()
     } catch (err) {
@@ -162,6 +180,28 @@ export function ComposeNotificationModal({ open, onClose, onSent }: Props) {
               />
             )}
           </div>
+
+          <FormField
+            control={form.control}
+            name="channel"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Deliver by</FormLabel>
+                <FormControl>
+                  <select className={selectClass} {...field}>
+                    <option value="IN_APP">In-app only (free)</option>
+                    <option value="EMAIL">In-app + email</option>
+                    <option value="SMS">In-app + SMS</option>
+                  </select>
+                </FormControl>
+                <p className="text-xs text-muted-foreground">
+                  The in-app notice is always saved first. Email/SMS is skipped while the server has no
+                  provider configured.
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           {form.formState.errors.root && (
             <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">

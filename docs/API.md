@@ -271,6 +271,33 @@ Audiences: `ALL · ADMINS · TEACHERS · STUDENTS · PARENTS · CLASS`. Read sta
 (`notification_reads`), so a broadcast stays unread until each account opens it. Teachers may
 target `STUDENTS`, `PARENTS` or one of their own classes — never `ALL` or another class.
 
+### Outbound email & SMS
+
+`POST /notifications` accepts `channel: IN_APP | EMAIL | SMS`. The in-app row is always written
+first, then delivery is attempted, so a provider outage can never lose the notice.
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cm…",
+    "delivery": { "attempted": 214, "sent": 211, "failed": 3, "channels": ["EMAIL"] }
+  }
+}
+```
+
+- Recipients for **EMAIL** are the active accounts in the audience (class-scoped for `CLASS`).
+- Recipients for **SMS** are guardian phone numbers — parents are who a school texts. A guardian
+  with two children in the same class is messaged once.
+- Delivery is **off unless configured** (`DELIVERY_ENABLED=true` plus `EMAIL_API_URL` /
+  `SMS_API_URL`). While off, the notice is saved and `delivery.attempted` is `0`.
+- Sends run with a 10 s timeout and 5-way concurrency; individual failures are logged and counted,
+  never thrown into the request.
+
+Supported transport shapes (see `backend/.env.example`): `EMAIL_PROVIDER=generic` posts
+`{from,to,subject,text}` / `{to,message}` with a bearer token to your URL; `EMAIL_PROVIDER=resend`
+uses Resend's email schema.
+
 ---
 
 ## Dashboards

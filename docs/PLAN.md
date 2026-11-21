@@ -141,6 +141,9 @@ Real aggregated stats, charts from DB, CSV/PDF export, admin report builder
 - [x] Self-service `PATCH /auth/profile` — role and email are no longer mass-assignable
 - [x] Admin audit-log API and screen with filters and pagination
 - [x] `/account/security` page for every role; bulk attendance is now one statement
+- [x] **Outbound email/SMS** — notices can be broadcast over a provider HTTP API with bounded
+      concurrency, timeouts and a per-send delivery report; the in-app record is written first, so
+      a provider outage never loses a notice
 
 ### Phase 7 — QA & deploy ✅ COMPLETE
 - [x] API + integration tests — 145 across 12 files

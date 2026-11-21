@@ -140,9 +140,21 @@ export function useDeliveryStats(enabled = true) {
 //  writes
 // ─────────────────────────────────────────────────────────────
 
+export interface DeliverySummary {
+  attempted: number
+  sent: number
+  failed: number
+  channels: NotificationChannel[]
+}
+
+export interface CreateNotificationResult {
+  id: string
+  delivery?: DeliverySummary
+}
+
 export function useCreateNotification() {
-  return useApiMutation<{ id: string }, CreateNotificationInput>((body) =>
-    apiFetch<{ id: string }>("/notifications", { method: "POST", body }),
+  return useApiMutation<CreateNotificationResult, CreateNotificationInput>((body) =>
+    apiFetch<CreateNotificationResult>("/notifications", { method: "POST", body }),
   )
 }
 

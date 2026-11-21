@@ -162,11 +162,14 @@ export const settingsSchema = z.object({
 // ── Notifications ────────────────────────────────────────────
 export const AUDIENCES = ["ALL", "ADMINS", "TEACHERS", "STUDENTS", "PARENTS", "CLASS"] as const
 
+export const CHANNELS = ["IN_APP", "EMAIL", "SMS"] as const
+
 export const noticeSchema = z
   .object({
     title: z.string().trim().min(3, "Title must be at least 3 characters").max(140),
     body: z.string().trim().min(5, "Message is too short").max(4000),
     audience: z.enum(AUDIENCES),
+    channel: z.enum(CHANNELS),
     classId: z.string(),
   })
   .refine((values) => values.audience !== "CLASS" || values.classId.length > 0, {
