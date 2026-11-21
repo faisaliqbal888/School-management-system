@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 import {
+  ShieldCheck,
   LayoutDashboard,
   ClipboardCheck,
   FileText,
@@ -44,6 +45,7 @@ const navigation = [
 const bottomNavigation = [
   { name: "Notifications", href: "/teacher/notifications", icon: Bell },
   { name: "My Profile", href: "/teacher/profile", icon: User },
+  { name: "Security", href: "/account/security", icon: ShieldCheck },
 ]
 
 export function TeacherSidebar() {

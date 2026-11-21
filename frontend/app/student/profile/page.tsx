@@ -18,10 +18,14 @@ import {
   UserRound,
 } from "lucide-react"
 import { useDashboardSummary } from "@/lib/hooks/use-dashboard"
+import { PersonalDetailsCard } from "@/components/account/account-security"
+import { Button } from "@/components/ui/button"
+import { ShieldCheck } from "lucide-react"
+import Link from "next/link"
 
 export default function StudentProfilePage() {
   const { ready } = useRequireRole("STUDENT")
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const { summary, isLoading } = useDashboardSummary()
 
   if (!ready) {
@@ -158,13 +162,27 @@ export default function StudentProfilePage() {
                 ))}
               </div>
 
+              <PersonalDetailsCard
+                initialName={user?.name ?? ""}
+                initialPhone={user?.phone ?? null}
+                email={user?.email ?? ""}
+                onSaved={refreshUser}
+              />
+
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Need a change?</CardTitle>
+                  <CardTitle className="text-base">Need another change?</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Name, class, section and guardian details can only be edited by the school office.
-                  Contact your class teacher or the admin desk if something looks wrong.
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                  <span>
+                    Class, section and guardian details can only be edited by the school office.
+                    Password and signed-in devices live under Security.
+                  </span>
+                  <Link href="/account/security">
+                    <Button variant="outline" size="sm">
+                      <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Security settings
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>

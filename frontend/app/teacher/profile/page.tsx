@@ -1,6 +1,10 @@
 "use client"
 
 import { useAuth, useRequireRole } from "@/lib/auth-context"
+import { PersonalDetailsCard } from "@/components/account/account-security"
+import { Button } from "@/components/ui/button"
+import { ShieldCheck } from "lucide-react"
+import Link from "next/link"
 import { TeacherSidebar } from "@/components/teacher/teacher-sidebar"
 import { TeacherHeader } from "@/components/teacher/teacher-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +18,7 @@ import type { TeacherProfile } from "@/lib/auth-context"
 
 export default function TeacherProfilePage() {
   const { ready } = useRequireRole("TEACHER")
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const { summary, isLoading } = useDashboardSummary()
 
   if (!ready) {
@@ -169,13 +173,27 @@ export default function TeacherProfilePage() {
                 </CardContent>
               </Card>
 
+              <PersonalDetailsCard
+                initialName={user?.name ?? ""}
+                initialPhone={user?.phone ?? null}
+                email={user?.email ?? ""}
+                onSaved={refreshUser}
+              />
+
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Need a change?</CardTitle>
+                  <CardTitle className="text-base">Need another change?</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-muted-foreground">
-                  Departments, designations and salary details are managed by the admin office.
-                  Ask HR to update your record if anything is out of date.
+                <CardContent className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                  <span>
+                    Departments, designations and salary details are managed by the admin office.
+                    Password and signed-in devices live under Security.
+                  </span>
+                  <Link href="/account/security">
+                    <Button variant="outline" size="sm">
+                      <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Security settings
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             </div>

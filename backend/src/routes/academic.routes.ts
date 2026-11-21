@@ -341,7 +341,21 @@ academicRouter.patch(
     const existing = await prisma.section.findUnique({ where: { id } })
     if (!existing) throw notFound('Section')
 
-    ok(res, await prisma.section.update({ where: { id }, data: req.body }))
+    // Explicit whitelist: zod strips unknown keys, but spelling the fields out
+    // keeps this safe even if the schema is widened later.
+    const body = req.body as Partial<z.infer<typeof sectionBody>>
+    ok(
+      res,
+      await prisma.section.update({
+        where: { id },
+        data: {
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.classId !== undefined ? { classId: body.classId } : {}),
+          ...(body.capacity !== undefined ? { capacity: body.capacity } : {}),
+          ...(body.roomNo !== undefined ? { roomNo: body.roomNo } : {}),
+        },
+      }),
+    )
   }),
 )
 

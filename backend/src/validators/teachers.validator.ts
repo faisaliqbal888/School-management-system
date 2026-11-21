@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { strongPasswordSchema } from './auth.validator.js'
 import { paginationSchema } from '../utils/pagination.js'
 
 const STAFF_STATUS = ['ACTIVE', 'ON_LEAVE', 'RESIGNED', 'TERMINATED'] as const
@@ -24,7 +25,7 @@ export const createTeacherSchema = z.object({
   employmentType: z.enum(EMPLOYMENT_TYPE).optional(),
   baseSalary: z.coerce.number().min(0, 'Salary cannot be negative').max(10_000_000),
   subjectIds: z.array(z.string().min(1)).max(30).optional(),
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200).optional(),
+  password: strongPasswordSchema.optional(),
   dob: z.coerce.date().nullish(),
   address: z.string().trim().max(300).nullish(),
   city: z.string().trim().max(80).nullish(),
