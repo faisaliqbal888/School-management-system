@@ -447,6 +447,18 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 
 ---
 
+## Testing
+
+```
+npm test                 # backend (needs DATABASE_URL + migrated schema) then frontend
+npm run test:backend
+npm run test:frontend
+```
+
+Backend suites hit a real Postgres through supertest; frontend suites are DOM-free Vitest checks of
+`lib/validation/schemas.ts` and `lib/api-client.ts` (CSRF header, one-shot refresh on 401, error
+envelope). CI runs both.
+
 ## Roadmap for the API surface
 
 | Phase | Adds |

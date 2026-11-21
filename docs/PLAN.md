@@ -149,7 +149,11 @@ Real aggregated stats, charts from DB, CSV/PDF export, admin report builder
 - [x] API + integration tests — 145 across 12 files
 - [x] Security pass — Helmet, CORS allowlist, `express-rate-limit`, zod on every body
 - [x] **Test coverage:** `students`, `teachers` and `academic` suites added — every route file
-      now has tests (220 total across 16 files), including a dedicated `security.test.ts`
+      now has tests (227 total across 17 files), including a dedicated `security.test.ts` and
+      `delivery.test.ts`
+- [x] **Frontend tests** — Vitest over the two layers where regressions actually cost something:
+      the zod schemas that gate every form (35 cases) and the API client's CSRF / refresh-retry /
+      error contract (8 cases). Run in CI before the build.
 - [x] **Lint runnable** — ESLint 9 flat config (Next 16 removed `next lint`), `npm run lint`
       reports 0 errors, and CI runs it before typecheck
 - [x] **Deploy** — `backend/Dockerfile` (multi-stage, non-root, HEALTHCHECK), `railway.json`,
