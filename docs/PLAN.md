@@ -161,6 +161,22 @@ Real aggregated stats, charts from DB, CSV/PDF export, admin report builder
 - [x] **Production seed path** — `scripts/create-admin.ts` bootstraps the first admin from env
       vars; `seed.ts` now refuses to run with `NODE_ENV=production`
 
+### Phase 8 — Closing the operational gaps ✅ COMPLETE
+- [x] **Operations write paths** — transport (vehicles, routes, riders), hostel (rooms, allocations,
+      vacate), inventory (items, stock adjustments), HR (staff, payroll runs, leave decisions) are
+      now full CRUD behind ADMIN, with the business rules enforced server-side: vehicle capacity
+      measured against its **busiest** route, deletes blocked while assignments exist, room capacity
+      ≥ occupied, one room per learner, no negative stock, `PENDING`-only leave decisions.
+- [x] **Operations UI** — create/edit dialogs (react-hook-form + zod) and workflow actions
+      (adjust stock, vacate bed, mark payroll paid, approve/reject leave) on the admin screens.
+- [x] **Avatar uploads** — `multer` in-memory → disk, magic-byte mime sniffing (PNG/JPEG/WebP only,
+      never the client's `Content-Type`), 2 MB cap, `POST /uploads/avatar`, previous file unlinked on
+      format change, served read-only from `/uploads` with `nosniff`.
+- [x] **Bulk CSV import** — `POST /students/import` with per-row validation, in-file duplicate
+      detection, existing-account checks and a **dry-run** mode; UI modal with template download.
+- [x] **Docs** — endpoint map, this phase log and `docs/API.md`'s import contract updated.
+- Verification: backend **281 tests / 20 files**, frontend typecheck + ESLint 0 errors + `next build`.
+
 ---
 
 ## 4. Conventions locked in

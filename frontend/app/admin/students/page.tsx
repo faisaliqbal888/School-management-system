@@ -7,6 +7,7 @@ import { AdminHeader } from "@/components/admin/admin-header"
 import { StudentTable } from "@/components/students/student-table"
 import { StudentFilters, type StudentFilterValues } from "@/components/students/student-filters"
 import { AddStudentModal } from "@/components/students/add-student-modal"
+import { ImportStudentsModal } from "@/components/students/import-students-modal"
 import { EditStudentModal } from "@/components/students/edit-student-modal"
 import { StudentDetailModal } from "@/components/students/student-detail-modal"
 import { Card, CardContent } from "@/components/ui/card"
@@ -52,6 +53,7 @@ export default function AdminStudentsPage() {
   const [exporting, setExporting] = useState(false)
 
   const [addOpen, setAddOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [selected, setSelected] = useState<StudentListItem | null>(null)
@@ -136,6 +138,7 @@ export default function AdminStudentsPage() {
             onChange={handleFilterChange}
             classes={classes}
             onAddStudent={() => setAddOpen(true)}
+            onImportStudents={() => setImportOpen(true)}
             onExport={handleExport}
             isExporting={exporting}
           />
@@ -165,6 +168,7 @@ export default function AdminStudentsPage() {
           />
 
           <AddStudentModal open={addOpen} onOpenChange={setAddOpen} onCreated={handleCreated} />
+          <ImportStudentsModal open={importOpen} onOpenChange={setImportOpen} onImported={refetch} />
           <EditStudentModal
             studentId={editOpen ? (selected?.id ?? null) : null}
             open={editOpen}

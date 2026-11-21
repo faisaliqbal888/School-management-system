@@ -1,5 +1,6 @@
 import { Prisma, type Role } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
+import { parseCsvTable } from '../utils/csv.js'
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js'
 import { hashPassword } from '../utils/password.js'
 import { buildMeta, type PaginationMeta } from '../utils/response.js'
@@ -627,4 +628,194 @@ export async function exportStudentsCsv(actor: Actor, filters: StudentListFilter
   )
 
   return [headers.map(escape).join(','), ...rows].join('\n')
+}
+
+// ─────────────────────────────────────────────────────────────
+//  BULK IMPORT
+// ─────────────────────────────────────────────────────────────
+
+/** Columns a bulk-import CSV must carry. Everything else is optional. */
+export const IMPORT_COLUMNS = [
+  'name',
+  'email',
+  'date_of_birth',
+  'gender',
+  'guardian_name',
+  'guardian_relation',
+  'guardian_phone',
+] as const
+
+export interface ImportRowError {
+  row: number
+  email: string
+  message: string
+}
+
+export interface ImportReport {
+  dryRun: boolean
+  total: number
+  imported: number
+  skipped: number
+  errors: ImportRowError[]
+  /** Only in dry-run mode: one sample of the credentials that would be issued. */
+  sample?: { name: string; email: string; temporaryPassword: string }
+}
+
+const GENDER_ALIASES: Record<string, 'MALE' | 'FEMALE' | 'OTHER'> = {
+  m: 'MALE',
+  male: 'MALE',
+  boy: 'MALE',
+  f: 'FEMALE',
+  female: 'FEMALE',
+  girl: 'FEMALE',
+  o: 'OTHER',
+  other: 'OTHER',
+}
+
+function normaliseDate(value: string): string | null {
+  if (!value) return null
+  // Accept 2010-05-12, 12/05/2010 and 12-05-2010; ambiguity is resolved to
+  // day-first because the schools using this are in Pakistan.
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (iso) return value
+
+  const dmy = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/.exec(value)
+  if (dmy) {
+    const [, d, m, y] = dmy
+    return `${y}-${m!.padStart(2, '0')}-${d!.padStart(2, '0')}`
+  }
+  return null
+}
+
+/**
+ * Imports learners from a CSV.
+ *
+ * `dryRun` validates every row and reports what *would* happen without writing
+ * anything. That is the default in the UI, because a 400-row import that fails
+ * halfway is far worse than one that never started.
+ *
+ * Each row is created through the same `createStudent` path as the single-entry
+ * form, so admission numbers, guardian linking and temp passwords behave
+ * identically — no second implementation to drift.
+ */
+export async function importStudents(
+  actor: Actor,
+  csvText: string,
+  options: { dryRun: boolean; defaultPassword?: string },
+): Promise<ImportReport> {
+  if (actor.role !== 'ADMIN') throw forbidden('Only administrators can import students')
+
+  const { headers, rows } = parseCsvTable(csvText)
+
+  const missing = IMPORT_COLUMNS.filter((column) => !headers.includes(column))
+  if (missing.length > 0) {
+    throw badRequest(`The CSV is missing required column(s): ${missing.join(', ')}`)
+  }
+
+  const errors: ImportRowError[] = []
+  const seenEmails = new Set<string>()
+  let imported = 0
+  let sample: ImportReport['sample']
+
+  for (const [index, row] of rows.entries()) {
+    // Row 1 is the header, so the human-readable number is index + 2.
+    const rowNumber = index + 2
+    const email = (row.email ?? '').toLowerCase()
+
+    const fail = (message: string) => {
+      errors.push({ row: rowNumber, email: email || '(blank)', message })
+    }
+
+    if (!email) {
+      fail('Email is required')
+      continue
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      fail('Email is not valid')
+      continue
+    }
+    // First occurrence wins; later ones are the duplicates. Registration order is
+    // the only sensible tie-break when a file repeats an address.
+    if (seenEmails.has(email)) {
+      fail('Duplicate email inside this file')
+      continue
+    }
+    seenEmails.add(email)
+
+    if ((row.name ?? '').length < 2) {
+      fail('Name is required')
+      continue
+    }
+
+    const dob = normaliseDate(row.date_of_birth ?? '')
+    if (!dob) {
+      fail('Date of birth must be YYYY-MM-DD or DD/MM/YYYY')
+      continue
+    }
+    if (new Date(dob) >= new Date()) {
+      fail('Date of birth must be in the past')
+      continue
+    }
+
+    const gender = GENDER_ALIASES[(row.gender ?? '').toLowerCase()]
+    if (!gender) {
+      fail('Gender must be MALE, FEMALE or OTHER')
+      continue
+    }
+
+    if ((row.guardian_name ?? '').length < 2) {
+      fail('Guardian name is required')
+      continue
+    }
+    if ((row.guardian_phone ?? '').replace(/\D/g, '').length < 7) {
+      fail('Guardian phone is required')
+      continue
+    }
+
+    const payload = {
+      name: row.name!.trim(),
+      email,
+      dateOfBirth: dob,
+      gender,
+      phone: row.phone || null,
+      city: row.city || null,
+      address: row.address || null,
+      guardian: {
+        name: row.guardian_name!.trim(),
+        relation: row.guardian_relation?.trim() || 'Guardian',
+        phone: row.guardian_phone!.trim(),
+        email: row.guardian_email?.trim() || null,
+      },
+      password: options.defaultPassword,
+    }
+
+    if (options.dryRun) {
+      // An existing account is the most common real-world conflict, so it is
+      // checked here too — otherwise a dry run would look clean then fail.
+      const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+      if (existing) {
+        fail('An account with this email already exists')
+        continue
+      }
+      imported += 1
+      continue
+    }
+
+    try {
+      const result = await createStudent(actor, payload as Parameters<typeof createStudent>[1])
+      imported += 1
+      if (!sample) sample = { name: payload.name, ...result.credentials }
+    } catch (error) {
+      fail(error instanceof Error ? error.message : 'Could not import this row')
+    }
+  }
+
+  return {
+    dryRun: options.dryRun,
+    total: rows.length,
+    imported,
+    skipped: errors.length,
+    errors,
+    ...(options.dryRun && sample ? { sample } : {}),
+  }
 }

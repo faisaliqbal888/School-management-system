@@ -162,6 +162,46 @@ STUDENT sees only themselves, PARENT sees their linked children.
 | POST | `/students` | ADMIN | Create — auto `ADM-YYYY-NNNN` + temp password. Returns `{ student, credentials }` |
 | PATCH | `/students/:id` | ADMIN | Update profile, status, guardian, or move section (re-enrolls) |
 | DELETE | `/students/:id` | ADMIN | Soft withdraw → `WITHDRAWN` + login disabled. `?hard=true` purges |
+| POST | `/students/import` | ADMIN | Bulk CSV import. Body `{ csv, dryRun=true, defaultPassword? }`. Returns `{ dryRun, total, imported, skipped, errors[{row,email,message}], sample? }` |
+
+### Bulk import — CSV (Students) ✅
+
+`POST /students/import` · ADMIN only · body `{ csv: string (1–2 MB), dryRun?: boolean = true, defaultPassword?: string }`
+
+The importer is **dry-run first by design**: a school uploads one file for a whole intake, so every
+problem must be visible *before* an account exists. Re-run with `dryRun: false` to create the rows
+that passed.
+
+| Column | Required | Notes |
+|---|---|---|
+| `name` | ✅ | min 2 chars |
+| `email` | ✅ | unique; duplicates **inside the file** are flagged (first occurrence wins) |
+| `date_of_birth` | ✅ | `YYYY-MM-DD` or `DD/MM/YYYY`, must be in the past |
+| `gender` | ✅ | `MALE`/`FEMALE`/`OTHER`, aliases `M`/`F`/`O`, `Male`/`Female`, `Boy`/`Girl` |
+| `guardian_name` | ✅ | |
+| `guardian_relation` | — | defaults to `Guardian` |
+| `guardian_phone` | ✅ | ≥ 7 digits after stripping non-digits |
+| `phone`, `city`, `address`, `guardian_email` | — | copied through when present |
+
+Response:
+
+```json
+{
+  "dryRun": true,
+  "total": 3,
+  "imported": 2,
+  "skipped": 1,
+  "errors": [{ "row": 4, "email": "bad@x", "message": "Email is not valid" }],
+  "sample": { "email": "…", "temporaryPassword": "…" }
+}
+```
+
+- `row` is the **spreadsheet row number** (header is row 1), so it lines up with Excel.
+- A dry run also checks for existing accounts, so 2 clean runs never turn into a failed import.
+- Each passing row is created through the normal `createStudent` path — same admission-number
+  sequence, same temporary-password rule, same audit entry.
+- The UI ships a template download (`students-import-template.csv`) and shows the error table
+  before enabling the Import button.
 
 ### Teachers — Phase 3 ✅
 
@@ -489,5 +529,6 @@ Every route below is served under `/api/v1` and shares the envelope
 | Notifications | `GET/POST /notifications`, `GET /notifications/unread-count`, `/options`, `/stats`, `POST /notifications/read-all`, `PATCH /notifications/:id` |
 | Dashboards | `GET /dashboard/summary` (role-aware) |
 | Reports | `GET /reports/fees`, `/attendance`, `/performance`, `/enrolment`, `/export` (CSV), `/export.pdf` (PDF) |
-| Operations | `GET /library/overview`, `/library/books`, `/library/issues`, `POST /library/issues`, `PATCH /library/issues/:id/return`, `POST /library/refresh-overdue`, `GET /transport/overview`, `/transport/routes/:id/riders`, `GET /hostel/overview`, `GET /inventory/overview`, `GET /hr/payroll`, `/hr/leaves` |
+| Operations | `GET /library/overview`, `/library/books`, `/library/issues`, `POST /library/issues`, `PATCH /library/issues/:id/return`, `POST /library/refresh-overdue`, `GET /transport/overview`, `/transport/routes/:id/riders`, `GET /hostel/overview`, `GET /inventory/overview`, `GET /hr/payroll`, `/hr/leaves` · **writes:** `POST/PATCH /transport/vehicles`, `/transport/routes`, `/transport/assignments` + `DELETE` for each, `POST/PATCH /hostel/rooms`, `/hostel/allocations`, `POST /hostel/allocations/:id/vacate`, `POST/PATCH /inventory/items`, `POST /inventory/items/:id/adjust`, `POST/PATCH /hr/staff`, `/hr/payroll` + `/hr/payroll/:period/pay`, `POST /hr/leaves`, `PATCH /hr/leaves/:id` |
+| Uploads | `POST /uploads/avatar` (multipart, PNG/JPEG/WebP ≤ 2 MB), `DELETE /uploads/avatar`, static `GET /uploads/avatars/:file` |
 | Administration | `GET/POST /admin/users`, `PATCH /admin/users/:id/status`, `POST /admin/users/:id/reset-password`, `GET /admin/staff`, `GET/PATCH /admin/settings`, `GET /admin/alerts` |
