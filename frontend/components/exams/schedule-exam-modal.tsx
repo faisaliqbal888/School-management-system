@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -20,10 +22,16 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { toast } from "sonner"
 import { CalendarPlus, Loader2 } from "lucide-react"
 import { useApiQuery } from "@/lib/hooks/use-api-query"
-import { EXAM_TYPE_LABEL, useCreateExam, type ExamType } from "@/lib/hooks/use-exams"
+import {
+  EXAM_TYPE_LABEL,
+  useCreateExam,
+  type ExamType,
+} from "@/lib/hooks/use-exams"
+import { EXAM_TYPES, examSchema, type ExamValues } from "@/lib/validation/schemas"
 
 interface ScheduleExamModalProps {
   open: boolean
@@ -49,7 +57,20 @@ interface SectionRow {
   name: string
 }
 
-const TYPES: ExamType[] = ["QUIZ", "UNIT_TEST", "MIDTERM", "FINAL", "PRACTICAL", "PROJECT"]
+const TYPES: ExamType[] = [...EXAM_TYPES]
+
+const emptyValues = (presetClassId?: string | null): ExamValues => ({
+  name: "",
+  type: "MIDTERM",
+  classId: presetClassId ?? "",
+  sectionId: "",
+  subjectId: "",
+  examDate: new Date().toISOString().slice(0, 10),
+  startTime: "09:00",
+  durationMin: 120,
+  totalMarks: 100,
+  passingMarks: 40,
+})
 
 export function ScheduleExamModal({
   open,
@@ -62,77 +83,55 @@ export function ScheduleExamModal({
   const classesQ = useApiQuery<ClassRow[]>("/classes?limit=100", { enabled: open })
   const subjectsQ = useApiQuery<SubjectRow[]>("/subjects?limit=100", { enabled: open })
 
-  const [name, setName] = useState("")
-  const [type, setType] = useState<ExamType>("MIDTERM")
-  const [classId, setClassId] = useState("")
-  const [sectionId, setSectionId] = useState("")
-  const [subjectId, setSubjectId] = useState("")
-  const [examDate, setExamDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [startTime, setStartTime] = useState("09:00")
-  const [durationMin, setDurationMin] = useState("120")
-  const [totalMarks, setTotalMarks] = useState("100")
-  const [passingMarks, setPassingMarks] = useState("40")
-  const [error, setError] = useState("")
-  const [saving, setSaving] = useState(false)
-
-  const sectionsQ = useApiQuery<SectionRow[]>(classId ? `/classes/${classId}/sections` : null, {
-    enabled: open && !!classId,
+  const form = useForm<ExamValues>({
+    resolver: zodResolver(examSchema),
+    defaultValues: emptyValues(presetClassId),
   })
 
-  useEffect(() => {
-    if (!open) return
-    setName("")
-    setType("MIDTERM")
-    setClassId(presetClassId ?? "")
-    setSectionId("")
-    setSubjectId("")
-    setExamDate(new Date().toISOString().slice(0, 10))
-    setStartTime("09:00")
-    setDurationMin("120")
-    setTotalMarks("100")
-    setPassingMarks("40")
-    setError("")
-  }, [open, presetClassId])
+  const className = form.watch("classId")
+  const [saving, setSaving] = useState(false)
+
+  const sectionsQ = useApiQuery<SectionRow[]>(className ? `/classes/${className}/sections` : null, {
+    enabled: open && !!className,
+  })
 
   // subjects filtered by the chosen class
   const subjects = useMemo(
-    () => (subjectsQ.data ?? []).filter((s) => !classId || s.classId === classId),
-    [subjectsQ.data, classId],
+    () => (subjectsQ.data ?? []).filter((s) => !className || s.classId === className),
+    [subjectsQ.data, className],
   )
 
-  const handleSubmit = async () => {
-    if (!name.trim()) return setError("Please enter an exam name")
-    if (!classId) return setError("Please choose a class")
-    if (!subjectId) return setError("Please choose a subject")
-    if (!examDate) return setError("Please choose an exam date")
-    if (Number(passingMarks) > Number(totalMarks)) {
-      return setError("Passing marks cannot exceed total marks")
-    }
+  useEffect(() => {
+    if (open) form.reset(emptyValues(presetClassId))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, presetClassId])
 
-    setError("")
+  const submit = form.handleSubmit(async (values) => {
     setSaving(true)
     try {
       await createExam({
-        name: name.trim(),
-        type,
-        examDate,
-        startTime: startTime || null,
-        durationMin: Number(durationMin) || 120,
-        totalMarks: Number(totalMarks) || 100,
-        passingMarks: Number(passingMarks) || 40,
-        classId,
-        sectionId: sectionId || null,
-        subjectId,
+        name: values.name,
+        type: values.type,
+        examDate: values.examDate,
+        startTime: values.startTime || null,
+        durationMin: values.durationMin || 120,
+        totalMarks: values.totalMarks || 100,
+        passingMarks: values.passingMarks || 0,
+        classId: values.classId,
+        sectionId: values.sectionId || null,
+        subjectId: values.subjectId,
       })
-      toast.success("Exam scheduled", { description: `${name} · ${examDate}` })
+      toast.success("Exam scheduled", { description: `${values.name} · ${values.examDate}` })
       onCreated?.()
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not schedule the exam")
+      form.setError("root", {
+        message: err instanceof Error ? err.message : "Could not schedule the exam",
+      })
     } finally {
       setSaving(false)
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,155 +150,205 @@ export function ScheduleExamModal({
           </div>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label>Exam name</Label>
-            <Input
-              placeholder="e.g. Midterm 2026 — Mathematics"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <Label>Exam name</Label>
+                <Input placeholder="e.g. Midterm 2026 — Mathematics" {...field} />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Type</Label>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {EXAM_TYPE_LABEL[t]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="examDate"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Date</Label>
+                  <Input type="date" {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Type</Label>
-              <Select value={type} onValueChange={(v) => setType(v as ExamType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {EXAM_TYPE_LABEL[t]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Date</Label>
-              <Input type="date" value={examDate} onChange={(e) => setExamDate(e.target.value)} />
-            </div>
+            <FormField
+              control={form.control}
+              name="classId"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Class</Label>
+                  <Select
+                    value={field.value}
+                    onValueChange={(next) => {
+                      field.onChange(next)
+                      form.setValue("sectionId", "")
+                      form.setValue("subjectId", "")
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(classesQ.data ?? []).map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="sectionId"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Section (optional)</Label>
+                  <Select value={field.value} onValueChange={field.onChange} disabled={!className}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={className ? "All sections" : "Choose a class first"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(sectionsQ.data ?? []).map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          Section {s.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Class</Label>
-              <Select
-                value={classId}
-                onValueChange={(v) => {
-                  setClassId(v)
-                  setSectionId("")
-                  setSubjectId("")
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(classesQ.data ?? []).map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Section (optional)</Label>
-              <Select value={sectionId} onValueChange={setSectionId} disabled={!classId}>
-                <SelectTrigger>
-                  <SelectValue placeholder={classId ? "All sections" : "Choose a class first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {(sectionsQ.data ?? []).map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      Section {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Subject</Label>
-            <Select value={subjectId} onValueChange={setSubjectId} disabled={!classId}>
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    !classId
-                      ? "Choose a class first"
-                      : subjectsQ.isLoading
-                        ? "Loading…"
-                        : "Choose a subject"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {subjects.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                    {s.code ? ` (${s.code})` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <FormField
+            control={form.control}
+            name="subjectId"
+            render={({ field }) => (
+              <FormItem>
+                <Label>Subject</Label>
+                <Select value={field.value} onValueChange={field.onChange} disabled={!className}>
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        !className
+                          ? "Choose a class first"
+                          : subjectsQ.isLoading
+                            ? "Loading…"
+                            : "Choose a subject"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subjects.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                        {s.code ? ` (${s.code})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
 
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-2">
-              <Label>Start time</Label>
-              <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Duration (min)</Label>
-              <Input
-                type="number"
-                min={10}
-                step={5}
-                value={durationMin}
-                onChange={(e) => setDurationMin(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Total marks</Label>
-              <Input
-                type="number"
-                min={1}
-                value={totalMarks}
-                onChange={(e) => setTotalMarks(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Passing marks</Label>
-            <Input
-              type="number"
-              min={0}
-              value={passingMarks}
-              onChange={(e) => setPassingMarks(e.target.value)}
+            <FormField
+              control={form.control}
+              name="startTime"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Start time</Label>
+                  <Input type="time" {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="durationMin"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Duration (min)</Label>
+                  <Input type="number" min={5} step={5} {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="totalMarks"
+              render={({ field }) => (
+                <FormItem>
+                  <Label>Total marks</Label>
+                  <Input type="number" min={1} {...field} />
+                  <FormMessage />
+                </FormItem>
+              )}
             />
           </div>
 
-          {error && (
+          <FormField
+            control={form.control}
+            name="passingMarks"
+            render={({ field }) => (
+              <FormItem>
+                <Label>Passing marks</Label>
+                <Input type="number" min={0} {...field} />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {form.formState.errors.root && (
             <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
             </Alert>
           )}
-        </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
-          </Button>
-          <Button onClick={() => void handleSubmit()} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {saving ? "Scheduling…" : "Schedule Exam"}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {saving ? "Scheduling…" : "Schedule Exam"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
