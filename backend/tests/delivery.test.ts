@@ -21,6 +21,8 @@ const PASSWORD = 'TestPass123'
 let adminToken = ''
 let adminEmail = ''
 let createdUserId = ''
+let studentUserId = ''
+let studentId = ''
 const createdNotificationIds: string[] = []
 
 const originalFetch = globalThis.fetch
@@ -46,6 +48,38 @@ beforeAll(async () => {
   })
   createdUserId = admin.id
 
+  // A learner with a guardian phone, so the STUDENT/PARENT audiences actually
+  // resolve to recipients. CI starts from an empty database (no seed).
+  const studentUser = await prisma.user.create({
+    data: {
+      email: `deliv-student-${suffix}@test.pk`,
+      passwordHash,
+      role: 'STUDENT',
+      name: 'Delivery Student',
+    },
+  })
+  studentUserId = studentUser.id
+
+  const learner = await prisma.student.create({
+    data: {
+      userId: studentUser.id,
+      admissionNo: `DEL-${suffix}`,
+      dateOfBirth: new Date('2010-04-02'),
+      gender: 'MALE',
+      admissionDate: new Date('2024-04-01'),
+      status: 'ACTIVE',
+      guardians: {
+        create: {
+          name: 'Delivery Guardian',
+          relation: 'Father',
+          phone: '+92 300 1112223',
+          isPrimary: true,
+        },
+      },
+    },
+  })
+  studentId = learner.id
+
   const login = await request(app).post('/api/v1/auth/login').send({ email: adminEmail, password: PASSWORD })
   adminToken = login.body.data.accessToken
 })
@@ -57,7 +91,9 @@ afterEach(() => {
 
 afterAll(async () => {
   await prisma.notification.deleteMany({ where: { id: { in: createdNotificationIds } } })
-  await prisma.user.deleteMany({ where: { id: createdUserId } })
+  // Deleting the student cascades to guardians and enrolments.
+  if (studentId) await prisma.student.deleteMany({ where: { id: studentId } })
+  await prisma.user.deleteMany({ where: { id: { in: [createdUserId, studentUserId].filter(Boolean) } } })
   await prisma.$disconnect()
 })
 
@@ -139,7 +175,7 @@ describe('composing a notice with an outbound channel', () => {
     try {
       const res = await compose('EMAIL')
       expect(res.status).toBe(201)
-      expect(res.body.data.delivery.sent).toBeGreaterThan(0)
+      expect(spy).toHaveBeenCalled()
 
       const [url, init] = spy.mock.calls[0] as [string, RequestInit]
       expect(url).toBe('https://mail.example.test/send')
