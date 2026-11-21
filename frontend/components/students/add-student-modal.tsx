@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -21,10 +23,10 @@ import {
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Camera, User, Users, FileText, Loader2, Copy, Check, CheckCircle2 } from "lucide-react"
+import { User, Users, FileText, Loader2, Copy, Check, CheckCircle2 } from "lucide-react"
 import { useApiQuery } from "@/lib/hooks/use-api-query"
 import { useCreateStudent } from "@/lib/hooks/use-students"
+import { studentSchema, type StudentFormValues } from "@/lib/validation/schemas"
 
 interface ClassRow {
   id: string
@@ -68,7 +70,6 @@ type FormState = typeof EMPTY_FORM
 
 export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentModalProps) {
   const [tab, setTab] = useState("personal")
-  const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [error, setError] = useState("")
   const [result, setResult] = useState<{ email: string; temporaryPassword: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -76,68 +77,67 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
   const createStudent = useCreateStudent()
   const [submitting, setSubmitting] = useState(false)
 
+  const form = useForm<StudentFormValues>({
+    resolver: zodResolver(studentSchema),
+    defaultValues: EMPTY_FORM,
+  })
+
+  const classId = form.watch("classId")
+
   const classesQ = useApiQuery<ClassRow[]>("/classes?limit=100", { enabled: open })
   const sectionsQ = useApiQuery<SectionRow[]>(
-    form.classId ? `/classes/${form.classId}/sections` : null,
-    { enabled: open && !!form.classId },
+    classId ? `/classes/${classId}/sections` : null,
+    { enabled: open && !!classId },
   )
 
   // reset whenever the modal opens
   useEffect(() => {
     if (open) {
-      setForm(EMPTY_FORM)
+      form.reset(EMPTY_FORM)
       setError("")
       setResult(null)
       setCopied(false)
       setTab("personal")
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }))
+    form.setValue(key, value as never, { shouldDirty: true })
 
-  const validate = (): string | null => {
-    if (form.name.trim().length < 2) return "Please enter the student's full name"
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return "Please enter a valid email address"
-    if (!form.dateOfBirth) return "Date of birth is required"
-    if (!form.gender) return "Please select a gender"
-    if (form.guardianName.trim().length < 2) return "Guardian name is required"
-    if (form.guardianPhone.trim().length < 7) return "Guardian phone number is required"
-    return null
+  const values = form.watch()
+
+  /** Jump to the tab that owns the first invalid field, so the user sees the message. */
+  const onInvalid = () => {
+    const fields = Object.keys(form.formState.errors)
+    if (fields.some((f) => f.startsWith("guardian"))) setTab("guardian")
+    else if (fields.some((f) => ["classId", "sectionId", "rollNo"].includes(f))) setTab("academic")
+    else setTab("personal")
   }
 
-  const handleSubmit = async () => {
-    const validationError = validate()
-    if (validationError) {
-      setError(validationError)
-      // jump to the tab that owns the failing field
-      if (validationError.toLowerCase().includes("guardian")) setTab("guardian")
-      else setTab("personal")
-      return
-    }
-
+  const handleSubmit = form.handleSubmit(async (data) => {
     setError("")
     setSubmitting(true)
     try {
       const res = await createStudent({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim() || undefined,
-        dateOfBirth: form.dateOfBirth,
-        gender: form.gender as "MALE" | "FEMALE" | "OTHER",
-        bloodGroup: form.bloodGroup.trim() || undefined,
-        address: form.address.trim() || undefined,
-        city: form.city.trim() || undefined,
-        classId: form.classId || undefined,
-        sectionId: form.sectionId || undefined,
-        rollNo: form.rollNo.trim() || undefined,
+        name: data.name.trim(),
+        email: data.email.trim(),
+        phone: (data.phone ?? "").trim() || undefined,
+        dateOfBirth: data.dateOfBirth,
+        gender: data.gender as "MALE" | "FEMALE" | "OTHER",
+        bloodGroup: (data.bloodGroup ?? "").trim() || undefined,
+        address: (data.address ?? "").trim() || undefined,
+        city: (data.city ?? "").trim() || undefined,
+        classId: data.classId || undefined,
+        sectionId: data.sectionId || undefined,
+        rollNo: (data.rollNo ?? "").trim() || undefined,
         guardian: {
-          name: form.guardianName.trim(),
-          relation: form.guardianRelation,
-          phone: form.guardianPhone.trim(),
-          email: form.guardianEmail.trim() || undefined,
-          cnic: form.guardianCnic.trim() || undefined,
-          occupation: form.guardianOccupation.trim() || undefined,
+          name: data.guardianName.trim(),
+          relation: data.guardianRelation,
+          phone: data.guardianPhone.trim(),
+          email: (data.guardianEmail ?? "").trim() || undefined,
+          cnic: (data.guardianCnic ?? "").trim() || undefined,
+          occupation: (data.guardianOccupation ?? "").trim() || undefined,
         },
       })
       setResult(res.credentials)
@@ -147,7 +147,7 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
     } finally {
       setSubmitting(false)
     }
-  }
+  }, onInvalid)
 
   const copyCredentials = async () => {
     if (!result) return
@@ -207,6 +207,7 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
           </DialogDescription>
         </DialogHeader>
 
+        <form onSubmit={handleSubmit} noValidate>
         <Tabs value={tab} onValueChange={setTab} className="w-full">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="personal" className="gap-2">
@@ -225,46 +226,29 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
 
           {/* PERSONAL */}
           <TabsContent value="personal" className="mt-6 space-y-6">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20 ring-4 ring-border">
-                <AvatarFallback className="bg-primary/10 text-2xl text-primary">
-                  {form.name
-                    .split(" ")
-                    .filter(Boolean)
-                    .slice(0, 2)
-                    .map((n) => n[0]?.toUpperCase())
-                    .join("") || "ST"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="space-y-1">
-                <p className="text-sm font-medium">Photo</p>
-                <p className="text-xs text-muted-foreground">
-                  Photo upload arrives with file storage in a later phase
-                </p>
-              </div>
-              <Button size="icon" variant="outline" className="ml-auto" disabled>
-                <Camera className="h-4 w-4" />
-              </Button>
-            </div>
+            <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+              The photo is set by the student after their first sign-in, from Account &amp; security —
+              uploads are tied to the signed-in account, so an admin cannot set another person&apos;s.
+            </p>
 
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Full Name" required>
+              <Field label="Full Name" required error={form.formState.errors.name?.message}>
                 <Input
                   placeholder="e.g. Hamza Tariq"
-                  value={form.name}
+                  value={values.name}
                   onChange={(e) => set("name", e.target.value)}
                 />
               </Field>
-              <Field label="Date of Birth" required>
+              <Field label="Date of Birth" required error={form.formState.errors.dateOfBirth?.message}>
                 <Input
                   type="date"
-                  value={form.dateOfBirth}
+                  value={values.dateOfBirth}
                   max={new Date().toISOString().slice(0, 10)}
                   onChange={(e) => set("dateOfBirth", e.target.value)}
                 />
               </Field>
-              <Field label="Gender" required>
-                <Select value={form.gender} onValueChange={(v) => set("gender", v as FormState["gender"])}>
+              <Field label="Gender" required error={form.formState.errors.gender?.message}>
+                <Select value={values.gender} onValueChange={(v) => set("gender", v as FormState["gender"])}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
@@ -275,38 +259,38 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Blood Group">
+              <Field label="Blood Group" error={form.formState.errors.bloodGroup?.message}>
                 <Input
                   placeholder="e.g. B+"
-                  value={form.bloodGroup}
+                  value={values.bloodGroup}
                   onChange={(e) => set("bloodGroup", e.target.value)}
                 />
               </Field>
-              <Field label="Email (student login)" required>
+              <Field label="Email (student login)" required error={form.formState.errors.email?.message}>
                 <Input
                   type="email"
                   placeholder="student@example.pk"
-                  value={form.email}
+                  value={values.email}
                   onChange={(e) => set("email", e.target.value)}
                 />
               </Field>
-              <Field label="Phone">
+              <Field label="Phone" error={form.formState.errors.phone?.message}>
                 <Input
                   type="tel"
                   placeholder="+92 300 1234567"
-                  value={form.phone}
+                  value={values.phone}
                   onChange={(e) => set("phone", e.target.value)}
                 />
               </Field>
-              <Field label="Address" className="md:col-span-2">
+              <Field label="Address" className="md:col-span-2" error={form.formState.errors.address?.message}>
                 <Input
                   placeholder="House, street, area"
-                  value={form.address}
+                  value={values.address}
                   onChange={(e) => set("address", e.target.value)}
                 />
               </Field>
-              <Field label="City">
-                <Input value={form.city} onChange={(e) => set("city", e.target.value)} />
+              <Field label="City" error={form.formState.errors.city?.message}>
+                <Input value={values.city} onChange={(e) => set("city", e.target.value)} />
               </Field>
             </div>
           </TabsContent>
@@ -314,16 +298,16 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
           {/* GUARDIAN */}
           <TabsContent value="guardian" className="mt-6 space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Guardian Name" required>
+              <Field label="Guardian Name" required error={form.formState.errors.guardianName?.message}>
                 <Input
                   placeholder="e.g. Tariq Mehmood"
-                  value={form.guardianName}
+                  value={values.guardianName}
                   onChange={(e) => set("guardianName", e.target.value)}
                 />
               </Field>
-              <Field label="Relation" required>
+              <Field label="Relation" required error={form.formState.errors.guardianRelation?.message}>
                 <Select
-                  value={form.guardianRelation}
+                  value={values.guardianRelation}
                   onValueChange={(v) => set("guardianRelation", v)}
                 >
                   <SelectTrigger>
@@ -340,33 +324,33 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Guardian Phone" required>
+              <Field label="Guardian Phone" required error={form.formState.errors.guardianPhone?.message}>
                 <Input
                   type="tel"
                   placeholder="+92 300 1234567"
-                  value={form.guardianPhone}
+                  value={values.guardianPhone}
                   onChange={(e) => set("guardianPhone", e.target.value)}
                 />
               </Field>
-              <Field label="Guardian Email">
+              <Field label="Guardian Email" error={form.formState.errors.guardianEmail?.message}>
                 <Input
                   type="email"
                   placeholder="guardian@example.pk"
-                  value={form.guardianEmail}
+                  value={values.guardianEmail}
                   onChange={(e) => set("guardianEmail", e.target.value)}
                 />
               </Field>
-              <Field label="CNIC">
+              <Field label="CNIC" error={form.formState.errors.guardianCnic?.message}>
                 <Input
                   placeholder="35202-1234567-8"
-                  value={form.guardianCnic}
+                  value={values.guardianCnic}
                   onChange={(e) => set("guardianCnic", e.target.value)}
                 />
               </Field>
-              <Field label="Occupation">
+              <Field label="Occupation" error={form.formState.errors.guardianOccupation?.message}>
                 <Input
                   placeholder="e.g. Engineer"
-                  value={form.guardianOccupation}
+                  value={values.guardianOccupation}
                   onChange={(e) => set("guardianOccupation", e.target.value)}
                 />
               </Field>
@@ -376,9 +360,9 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
           {/* ACADEMIC */}
           <TabsContent value="academic" className="mt-6 space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Class">
+              <Field label="Class" error={form.formState.errors.classId?.message}>
                 <Select
-                  value={form.classId}
+                  value={values.classId}
                   onValueChange={(v) => {
                     set("classId", v)
                     set("sectionId", "")
@@ -397,16 +381,16 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
                 </Select>
               </Field>
 
-              <Field label="Section">
+              <Field label="Section" error={form.formState.errors.sectionId?.message}>
                 <Select
-                  value={form.sectionId}
+                  value={values.sectionId}
                   onValueChange={(v) => set("sectionId", v)}
-                  disabled={!form.classId}
+                  disabled={!values.classId}
                 >
                   <SelectTrigger>
                     <SelectValue
                       placeholder={
-                        !form.classId
+                        !values.classId
                           ? "Select a class first"
                           : sectionsQ.isLoading
                             ? "Loading…"
@@ -424,10 +408,10 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
                 </Select>
               </Field>
 
-              <Field label="Roll Number">
+              <Field label="Roll Number" error={form.formState.errors.rollNo?.message}>
                 <Input
                   placeholder="e.g. 10A05"
-                  value={form.rollNo}
+                  value={values.rollNo}
                   onChange={(e) => set("rollNo", e.target.value)}
                 />
               </Field>
@@ -447,14 +431,15 @@ export function AddStudentModal({ open, onOpenChange, onCreated }: AddStudentMod
         )}
 
         <DialogFooter className="mt-6 gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          <Button type="submit" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {submitting ? "Enrolling…" : "Enrol Student"}
           </Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
@@ -464,11 +449,13 @@ function Field({
   label,
   required,
   className,
+  error,
   children,
 }: {
   label: string
   required?: boolean
   className?: string
+  error?: string
   children: React.ReactNode
 }) {
   return (
@@ -478,6 +465,7 @@ function Field({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }

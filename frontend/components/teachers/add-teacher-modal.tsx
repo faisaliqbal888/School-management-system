@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -28,6 +30,7 @@ import {
   useTeacherOptions,
   type EmploymentType,
 } from "@/lib/hooks/use-teachers"
+import { teacherSchema, type TeacherFormValues } from "@/lib/validation/schemas"
 
 interface AddTeacherModalProps {
   open: boolean
@@ -45,14 +48,20 @@ const EMPTY = {
   specialization: "",
   joiningDate: new Date().toISOString().slice(0, 10),
   employmentType: "PERMANENT" as EmploymentType,
-  baseSalary: "",
+  baseSalary: 0,
   subjectIds: [] as string[],
 }
 
 export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherModalProps) {
   const [tab, setTab] = useState("personal")
-  const [form, setForm] = useState(EMPTY)
   const [error, setError] = useState("")
+
+  const form = useForm<TeacherFormValues>({
+    resolver: zodResolver(teacherSchema),
+    defaultValues: EMPTY,
+  })
+  const values = form.watch()
+  const subjectIds = values.subjectIds ?? []
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<{ email: string; temporaryPassword: string } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -62,60 +71,49 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
 
   useEffect(() => {
     if (!open) return
-    setForm(EMPTY)
+    form.reset(EMPTY)
     setError("")
     setResult(null)
     setCopied(false)
     setTab("personal")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
 
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }))
+  const set = <K extends keyof typeof EMPTY>(key: K, value: (typeof EMPTY)[K]) =>
+    form.setValue(key, value as never, { shouldDirty: true })
 
   const toggleSubject = (id: string) => {
-    setForm((prev) => ({
-      ...prev,
-      subjectIds: prev.subjectIds.includes(id)
-        ? prev.subjectIds.filter((s) => s !== id)
-        : [...prev.subjectIds, id],
-    }))
+    form.setValue(
+      "subjectIds",
+      subjectIds.includes(id) ? subjectIds.filter((s) => s !== id) : [...subjectIds, id],
+      { shouldDirty: true },
+    )
   }
 
-  const validate = (): string | null => {
-    if (form.name.trim().length < 2) return "Please enter the teacher's full name"
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) return "Please enter a valid email address"
-    if (!form.department.trim()) return "Department is required"
-    if (!form.designation.trim()) return "Designation is required"
-    if (!form.joiningDate) return "Joining date is required"
-    if (!form.baseSalary || Number(form.baseSalary) <= 0) return "Enter a valid base salary"
-    return null
+  const onInvalid = () => {
+    const fields = Object.keys(form.formState.errors)
+    if (fields.some((f) => ["joiningDate", "baseSalary", "employmentType"].includes(f))) setTab("salary")
+    else if (fields.some((f) => ["department", "designation", "qualification", "specialization"].includes(f)))
+      setTab("professional")
+    else setTab("personal")
   }
 
-  const handleSubmit = async () => {
-    const missing = validate()
-    if (missing) {
-      setError(missing)
-      if (missing.includes("salary") || missing.includes("Joining")) setTab("salary")
-      else if (missing.includes("Department") || missing.includes("Designation")) setTab("professional")
-      else setTab("personal")
-      return
-    }
-
+  const handleSubmit = form.handleSubmit(async (data) => {
     setError("")
     setSubmitting(true)
     try {
       const res = await createTeacher({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim() || null,
-        department: form.department.trim(),
-        designation: form.designation.trim(),
-        qualification: form.qualification.trim() || null,
-        specialization: form.specialization.trim() || null,
-        joiningDate: form.joiningDate,
-        employmentType: form.employmentType,
-        baseSalary: Number(form.baseSalary),
-        subjectIds: form.subjectIds,
+        name: data.name.trim(),
+        email: data.email.trim(),
+        phone: data.phone?.trim() || null,
+        department: data.department.trim(),
+        designation: data.designation.trim(),
+        qualification: data.qualification?.trim() || null,
+        specialization: data.specialization?.trim() || null,
+        joiningDate: data.joiningDate,
+        employmentType: data.employmentType,
+        baseSalary: Number(data.baseSalary),
+        subjectIds: data.subjectIds ?? [],
       })
       setResult(res.credentials)
       onCreated?.()
@@ -124,7 +122,7 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
     } finally {
       setSubmitting(false)
     }
-  }
+  }, onInvalid)
 
   const copyCredentials = async () => {
     if (!result) return
@@ -183,6 +181,7 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
           </DialogDescription>
         </DialogHeader>
 
+        <form onSubmit={handleSubmit} noValidate>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="personal" className="gap-2">
@@ -202,33 +201,33 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
           {/* PERSONAL */}
           <TabsContent value="personal" className="mt-6 space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Full Name" required>
+              <Field label="Full Name" required error={form.formState.errors.name?.message}>
                 <Input
                   placeholder="e.g. Sana Riaz"
-                  value={form.name}
+                  value={values.name}
                   onChange={(e) => set("name", e.target.value)}
                 />
               </Field>
-              <Field label="Email (portal login)" required>
+              <Field label="Email (portal login)" required error={form.formState.errors.email?.message}>
                 <Input
                   type="email"
                   placeholder="name@ravischool.edu.pk"
-                  value={form.email}
+                  value={values.email}
                   onChange={(e) => set("email", e.target.value)}
                 />
               </Field>
-              <Field label="Phone">
+              <Field label="Phone" error={form.formState.errors.phone?.message}>
                 <Input
                   type="tel"
                   placeholder="+92 300 1234567"
-                  value={form.phone}
+                  value={values.phone}
                   onChange={(e) => set("phone", e.target.value)}
                 />
               </Field>
-              <Field label="Qualification">
+              <Field label="Qualification" error={form.formState.errors.qualification?.message}>
                 <Input
                   placeholder="e.g. MSc Physics, B.Ed"
-                  value={form.qualification}
+                  value={values.qualification}
                   onChange={(e) => set("qualification", e.target.value)}
                 />
               </Field>
@@ -238,11 +237,11 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
           {/* PROFESSIONAL */}
           <TabsContent value="professional" className="mt-6 space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Department" required>
+              <Field label="Department" required error={form.formState.errors.department?.message}>
                 <Input
                   list="department-options"
                   placeholder="e.g. Mathematics"
-                  value={form.department}
+                  value={values.department}
                   onChange={(e) => set("department", e.target.value)}
                 />
                 <datalist id="department-options">
@@ -251,11 +250,11 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
                   ))}
                 </datalist>
               </Field>
-              <Field label="Designation" required>
+              <Field label="Designation" required error={form.formState.errors.designation?.message}>
                 <Input
                   list="designation-options"
                   placeholder="e.g. Senior Teacher"
-                  value={form.designation}
+                  value={values.designation}
                   onChange={(e) => set("designation", e.target.value)}
                 />
                 <datalist id="designation-options">
@@ -264,10 +263,10 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
                   ))}
                 </datalist>
               </Field>
-              <Field label="Specialization" className="md:col-span-2">
+              <Field label="Specialization" className="md:col-span-2" error={form.formState.errors.specialization?.message}>
                 <Input
                   placeholder="e.g. Algebra & Calculus"
-                  value={form.specialization}
+                  value={values.specialization}
                   onChange={(e) => set("specialization", e.target.value)}
                 />
               </Field>
@@ -280,7 +279,7 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
                   <span className="text-sm text-muted-foreground">Loading subjects…</span>
                 ) : (
                   (options?.subjects ?? []).map((s) => {
-                    const active = form.subjectIds.includes(s.id)
+                    const active = subjectIds.includes(s.id)
                     return (
                       <button key={s.id} type="button" onClick={() => toggleSubject(s.id)}>
                         <Badge
@@ -295,7 +294,7 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {form.subjectIds.length} selected — you can change these later.
+                {subjectIds.length} selected — you can change these later.
               </p>
             </div>
           </TabsContent>
@@ -303,16 +302,16 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
           {/* EMPLOYMENT */}
           <TabsContent value="salary" className="mt-6 space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Joining Date" required>
+              <Field label="Joining Date" required error={form.formState.errors.joiningDate?.message}>
                 <Input
                   type="date"
-                  value={form.joiningDate}
+                  value={values.joiningDate}
                   onChange={(e) => set("joiningDate", e.target.value)}
                 />
               </Field>
-              <Field label="Employment Type">
+              <Field label="Employment Type" error={form.formState.errors.employmentType?.message}>
                 <Select
-                  value={form.employmentType}
+                  value={values.employmentType}
                   onValueChange={(v) => set("employmentType", v as EmploymentType)}
                 >
                   <SelectTrigger>
@@ -326,14 +325,14 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
                   </SelectContent>
                 </Select>
               </Field>
-              <Field label="Base Salary (PKR / month)" required>
+              <Field label="Base Salary (PKR / month)" required error={form.formState.errors.baseSalary?.message}>
                 <Input
                   type="number"
                   min={0}
                   step={500}
                   placeholder="e.g. 95000"
-                  value={form.baseSalary}
-                  onChange={(e) => set("baseSalary", e.target.value)}
+                  value={values.baseSalary}
+                  onChange={(e) => set("baseSalary", Number(e.target.value))}
                 />
               </Field>
             </div>
@@ -351,14 +350,15 @@ export function AddTeacherModal({ open, onOpenChange, onCreated }: AddTeacherMod
         )}
 
         <DialogFooter className="mt-6 gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          <Button type="submit" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {submitting ? "Saving…" : "Add Teacher"}
           </Button>
         </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )
@@ -368,11 +368,13 @@ function Field({
   label,
   required,
   className,
+  error,
   children,
 }: {
   label: string
   required?: boolean
   className?: string
+  error?: string
   children: React.ReactNode
 }) {
   return (
@@ -382,6 +384,7 @@ function Field({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }

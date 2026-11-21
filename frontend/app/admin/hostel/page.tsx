@@ -6,14 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import { BedDouble, Building2, Loader2, Users, Wallet } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { BedDouble, Building2, Loader2, Pencil, Plus, Users, Wallet } from "lucide-react"
 import { useRequireRole } from "@/lib/auth-context"
 import { money, useHostelOverview } from "@/lib/hooks/use-operations"
+import { useState } from "react"
+import { AllocateDialog, RoomDialog } from "@/components/operations/hostel-dialogs"
 import { cn } from "@/lib/utils"
 
 export default function AdminHostelPage() {
   const { ready } = useRequireRole("ADMIN")
-  const { overview, isLoading, error } = useHostelOverview()
+  const { overview, isLoading, error, refetch } = useHostelOverview()
+
+  const [roomOpen, setRoomOpen] = useState(false)
+  const [editingRoom, setEditingRoom] = useState<(typeof rooms)[number] | null>(null)
+  const [allocateRoom, setAllocateRoom] = useState<(typeof rooms)[number] | null>(null)
 
   if (!ready) {
     return (
@@ -44,13 +51,23 @@ export default function AdminHostelPage() {
       <div className="transition-all duration-300 lg:pl-64">
         <AdminHeader />
         <main className="space-y-6 p-6">
-          <div>
-            <h1 className="text-2xl font-bold">Hostel</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Hostel</h1>
             <p className="text-muted-foreground">
               {overview?.occupancyRate !== null && overview?.occupancyRate !== undefined
                 ? `${overview.occupancyRate}% occupancy · ${overview.activeAllocations} active allocations`
-                : "Room allocation and occupancy"}
-            </p>
+                  : "Room allocation and occupancy"}
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                setEditingRoom(null)
+                setRoomOpen(true)
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Add room
+            </Button>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -101,13 +118,36 @@ export default function AdminHostelPage() {
                       <div key={room.id} className="rounded-lg border p-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-medium">{room.roomNo}</p>
-                          <Badge variant="outline" className="text-[10px]">
-                            {room.type.toLowerCase()}
-                          </Badge>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-[10px]">
+                              {room.type.toLowerCase()}
+                            </Badge>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              aria-label={`Edit room ${room.roomNo}`}
+                              onClick={() => {
+                                setEditingRoom(room)
+                                setRoomOpen(true)
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {room.occupied}/{room.capacity} beds · PKR {money(room.monthlyFee)}/mo
                         </p>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="mt-2 h-7 w-full text-xs"
+                          onClick={() => setAllocateRoom(room)}
+                        >
+                          Manage beds
+                        </Button>
 
                         {room.residents.length === 0 ? (
                           <p className="mt-2 text-xs text-muted-foreground">Empty</p>
@@ -139,6 +179,13 @@ export default function AdminHostelPage() {
               </CardContent>
             </Card>
           )}
+          <RoomDialog open={roomOpen} onOpenChange={setRoomOpen} room={editingRoom} onSaved={refetch} />
+          <AllocateDialog
+            open={allocateRoom !== null}
+            onOpenChange={(next) => !next && setAllocateRoom(null)}
+            room={allocateRoom}
+            onSaved={refetch}
+          />
         </main>
       </div>
     </div>

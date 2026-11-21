@@ -30,6 +30,17 @@ export interface IssuedTokens {
   refreshToken: string
 }
 
+/**
+ * Brute-force policy.
+ *
+ * The rate limiter already throttles per IP, but a distributed attack rotates
+ * IPs, so failures are also counted per account. The counter resets on a
+ * successful sign-in; passing the threshold locks the account for a window that
+ * grows with each subsequent wave.
+ */
+const MAX_FAILED_ATTEMPTS = 5
+const LOCKOUT_MS = 15 * 60 * 1000
+
 interface ClientMeta {
   userAgent?: string | undefined
   ipAddress?: string | undefined
@@ -57,11 +68,49 @@ export async function login(
   password: string,
   req: Request,
 ): Promise<{ user: SessionUser; tokens: IssuedTokens }> {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } })
+  const normalised = email.toLowerCase().trim()
+  const user = await prisma.user.findUnique({ where: { email: normalised } })
 
-  const passwordOk = user ? await verifyPassword(password, user.passwordHash) : false
+  // Identical timing and wording whether the account exists or not, so the
+  // endpoint cannot be used to enumerate addresses.
+  if (!user) {
+    await verifyPassword(password, '$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv')
+    throw unauthorized('Invalid email or password')
+  }
 
-  if (!user || !passwordOk) {
+  if (user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
+    const minutes = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60_000)
+    throw unauthorized(`Too many failed attempts. Try again in ${minutes} minute(s).`)
+  }
+
+  const passwordOk = await verifyPassword(password, user.passwordHash)
+
+  if (!passwordOk) {
+    const attempts = user.failedLoginAttempts + 1
+    const shouldLock = attempts >= MAX_FAILED_ATTEMPTS
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        failedLoginAttempts: attempts,
+        lockedUntil: shouldLock ? new Date(Date.now() + LOCKOUT_MS) : null,
+      },
+    })
+
+    if (shouldLock) {
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'auth.lockout',
+          entity: 'User',
+          entityId: user.id,
+          ipAddress: req.ip,
+          metadata: { attempts },
+        },
+      })
+      throw unauthorized('Too many failed attempts. This account is locked for 15 minutes.')
+    }
+
     throw unauthorized('Invalid email or password')
   }
 
@@ -75,7 +124,12 @@ export async function login(
 
   const tokens = await issueTokens(user, clientMeta(req))
 
-  await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } })
+  // Successful sign-in clears the failure counter and any expired lock.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginAt: new Date(), failedLoginAttempts: 0, lockedUntil: null },
+  })
+
   await prisma.auditLog.create({
     data: {
       userId: user.id,

@@ -4,11 +4,16 @@ import { AdminSidebar } from "@/components/admin/admin-sidebar"
 import { AdminHeader } from "@/components/admin/admin-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Bus, Loader2, MapPin, Phone, Route, Users } from "lucide-react"
+import { Bus, Loader2, MapPin, Pencil, Phone, Plus, Route, Trash2, Users } from "lucide-react"
 import { useRequireRole } from "@/lib/auth-context"
 import { money, useTransportOverview } from "@/lib/hooks/use-operations"
 import { cn } from "@/lib/utils"
+import { useState } from "react"
+import { toast } from "sonner"
+import { RouteDialog, VehicleDialog } from "@/components/operations/transport-dialogs"
+import { useRouteMutations } from "@/lib/hooks/use-operations"
 
 const statusTone: Record<string, string> = {
   ACTIVE: "bg-emerald-100 text-emerald-700",
@@ -18,7 +23,12 @@ const statusTone: Record<string, string> = {
 
 export default function AdminTransportPage() {
   const { ready } = useRequireRole("ADMIN")
-  const { overview, isLoading, error } = useTransportOverview()
+  const { overview, isLoading, error, refetch } = useTransportOverview()
+  const { remove: removeRoute } = useRouteMutations(refetch)
+
+  const [vehicleOpen, setVehicleOpen] = useState(false)
+  const [routeOpen, setRouteOpen] = useState(false)
+  const [editingRoute, setEditingRoute] = useState<(typeof routes)[number] | null>(null)
 
   if (!ready) {
     return (
@@ -49,9 +59,24 @@ export default function AdminTransportPage() {
       <div className="transition-all duration-300 lg:pl-64">
         <AdminHeader />
         <main className="space-y-6 p-6">
-          <div>
-            <h1 className="text-2xl font-bold">Transport</h1>
-            <p className="text-muted-foreground">Routes, vehicles and riders</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold">Transport</h1>
+              <p className="text-muted-foreground">Routes, vehicles and riders</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setVehicleOpen(true)}>
+                <Bus className="mr-2 h-4 w-4" /> Add vehicle
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingRoute(null)
+                  setRouteOpen(true)
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" /> New route
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -98,9 +123,40 @@ export default function AdminTransportPage() {
                           {route.startPoint} → {route.endPoint} · {route.distanceKm} km
                         </p>
                       </div>
-                      <Badge variant={route.isActive ? "secondary" : "outline"}>
-                        {route.isActive ? "active" : "paused"}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant={route.isActive ? "secondary" : "outline"}>
+                          {route.isActive ? "active" : "paused"}
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8"
+                          aria-label={`Edit ${route.name}`}
+                          onClick={() => {
+                            setEditingRoute(route)
+                            setRouteOpen(true)
+                          }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 text-destructive"
+                          aria-label={`Delete ${route.name}`}
+                          disabled={removeRoute.isPending}
+                          onClick={async () => {
+                            try {
+                              await removeRoute.mutate(route.id)
+                              toast.success("Route removed")
+                            } catch (err) {
+                              toast.error(err instanceof Error ? err.message : "Could not remove the route")
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -146,6 +202,14 @@ export default function AdminTransportPage() {
               ))}
             </div>
           )}
+          <VehicleDialog open={vehicleOpen} onOpenChange={setVehicleOpen} onSaved={refetch} />
+          <RouteDialog
+            open={routeOpen}
+            onOpenChange={setRouteOpen}
+            route={editingRoute}
+            vehicles={overview?.vehicles ?? []}
+            onSaved={refetch}
+          />
         </main>
       </div>
     </div>

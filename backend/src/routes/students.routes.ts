@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import type { z } from 'zod'
+import { z } from 'zod'
 import { asyncHandler } from '../utils/async-handler.js'
 import { authenticate, authorize } from '../middleware/auth.js'
 import { validate } from '../middleware/validate.js'
@@ -13,14 +13,45 @@ import {
   studentListQuery,
   updateStudentSchema,
 } from '../validators/students.validator.js'
+import { strongPasswordSchema } from '../validators/auth.validator.js'
 import type { Role } from '@prisma/client'
 
 export const studentsRouter = Router()
+
+const importBody = z.object({
+  csv: z.string().min(1, 'Paste or upload a CSV first').max(2_000_000),
+  dryRun: z.boolean().default(true),
+  defaultPassword: strongPasswordSchema.optional(),
+})
 
 const actorOf = (req: Parameters<typeof students.listStudents>[0] extends never ? never : { user?: { id: string; role: Role } }) => ({
   id: req.user!.id,
   role: req.user!.role,
 })
+
+// ─────────────────────────────────────────────────────────────
+//  POST /students/import — bulk CSV enrolment (ADMIN)
+// ─────────────────────────────────────────────────────────────
+
+studentsRouter.post(
+  '/students/import',
+  authenticate,
+  authorize('ADMIN'),
+  validate({ body: importBody }),
+  asyncHandler(async (req, res) => {
+    const { csv, dryRun, defaultPassword } = req.body as {
+      csv: string
+      dryRun: boolean
+      defaultPassword?: string
+    }
+    const report = await students.importStudents(
+      { id: req.user!.id, role: req.user!.role },
+      csv,
+      { dryRun, defaultPassword },
+    )
+    ok(res, report)
+  }),
+)
 
 // ─────────────────────────────────────────────────────────────
 //  GET /students  — paginated, filtered, scoped by role

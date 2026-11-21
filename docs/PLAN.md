@@ -127,20 +127,55 @@ Real aggregated stats, charts from DB, CSV/PDF export, admin report builder
 - [x] **Image optimisation** — 61 unreferenced assets deleted (`public/` 31 MB → 876 KB), the
       Next optimiser re-enabled (AVIF/WebP) and avatars defer loading
 - [x] **Form validation with RHF + zod** — `components/ui/form.tsx` primitives plus
-      `lib/validation/schemas.ts`; the users, subjects, classes/sections and settings forms are
-      migrated (the two remaining legacy modals keep their inline checks)
+      `lib/validation/schemas.ts`. Every form is migrated: users, subjects, classes/sections,
+      settings, add/edit student, add/edit teacher, raise invoice, record payment, schedule exam,
+      timetable slot, compose notice and the account/security forms. Per-field messages replace the
+      old single `setError` banner, and a failed multi-tab submit jumps to the tab owning the error.
+
+### Phase 6b — Security hardening ✅ COMPLETE
+- [x] Account lockout (5 failures → 15 min) with `auth.lockout` audit entries and dummy-hash
+      verification so timing cannot be used to enumerate accounts
+- [x] Strong password policy shared by change-password and every account-creation path
+- [x] CSRF double-submit tokens for cookie-authenticated writes
+- [x] Session management (list/revoke devices), password change revokes all sessions
+- [x] Self-service `PATCH /auth/profile` — role and email are no longer mass-assignable
+- [x] Admin audit-log API and screen with filters and pagination
+- [x] `/account/security` page for every role; bulk attendance is now one statement
+- [x] **Outbound email/SMS** — notices can be broadcast over a provider HTTP API with bounded
+      concurrency, timeouts and a per-send delivery report; the in-app record is written first, so
+      a provider outage never loses a notice
 
 ### Phase 7 — QA & deploy ✅ COMPLETE
 - [x] API + integration tests — 145 across 12 files
 - [x] Security pass — Helmet, CORS allowlist, `express-rate-limit`, zod on every body
 - [x] **Test coverage:** `students`, `teachers` and `academic` suites added — every route file
-      now has tests (203 total across 15 files)
+      now has tests (227 total across 17 files), including a dedicated `security.test.ts` and
+      `delivery.test.ts`
+- [x] **Frontend tests** — Vitest over the two layers where regressions actually cost something:
+      the zod schemas that gate every form (35 cases) and the API client's CSRF / refresh-retry /
+      error contract (8 cases). Run in CI before the build.
 - [x] **Lint runnable** — ESLint 9 flat config (Next 16 removed `next lint`), `npm run lint`
       reports 0 errors, and CI runs it before typecheck
 - [x] **Deploy** — `backend/Dockerfile` (multi-stage, non-root, HEALTHCHECK), `railway.json`,
       `frontend/vercel.json` with security headers, and `docs/DEPLOYMENT.md`
 - [x] **Production seed path** — `scripts/create-admin.ts` bootstraps the first admin from env
       vars; `seed.ts` now refuses to run with `NODE_ENV=production`
+
+### Phase 8 — Closing the operational gaps ✅ COMPLETE
+- [x] **Operations write paths** — transport (vehicles, routes, riders), hostel (rooms, allocations,
+      vacate), inventory (items, stock adjustments), HR (staff, payroll runs, leave decisions) are
+      now full CRUD behind ADMIN, with the business rules enforced server-side: vehicle capacity
+      measured against its **busiest** route, deletes blocked while assignments exist, room capacity
+      ≥ occupied, one room per learner, no negative stock, `PENDING`-only leave decisions.
+- [x] **Operations UI** — create/edit dialogs (react-hook-form + zod) and workflow actions
+      (adjust stock, vacate bed, mark payroll paid, approve/reject leave) on the admin screens.
+- [x] **Avatar uploads** — `multer` in-memory → disk, magic-byte mime sniffing (PNG/JPEG/WebP only,
+      never the client's `Content-Type`), 2 MB cap, `POST /uploads/avatar`, previous file unlinked on
+      format change, served read-only from `/uploads` with `nosniff`.
+- [x] **Bulk CSV import** — `POST /students/import` with per-row validation, in-file duplicate
+      detection, existing-account checks and a **dry-run** mode; UI modal with template download.
+- [x] **Docs** — endpoint map, this phase log and `docs/API.md`'s import contract updated.
+- Verification: backend **281 tests / 20 files**, frontend typecheck + ESLint 0 errors + `next build`.
 
 ---
 

@@ -97,6 +97,19 @@ Authorization: Bearer <accessToken>
 
 A cookie named `access_token` is accepted as a fallback.
 
+### CSRF protection
+
+Cookie-authenticated writes are protected against cross-site request forgery using the
+double-submit pattern:
+
+1. `GET /api/v1/csrf` returns `{ csrfToken }` and sets a **readable** `csrf_token` cookie.
+2. Echo the value in an `X-CSRF-Token` header on every `POST`, `PATCH`, `PUT` and `DELETE`.
+
+Requests authenticated with `Authorization: Bearer …` are exempt (no ambient cookie), and so are
+requests that carry no `refresh_token` cookie at all. A cookie-auth write without a matching header
+is rejected with `403 CSRF_TOKEN_INVALID`. The bundled frontend does this automatically in
+`lib/api-client.ts`.
+
 | Role | Access |
 |---|---|
 | `ADMIN` | everything |
@@ -149,6 +162,46 @@ STUDENT sees only themselves, PARENT sees their linked children.
 | POST | `/students` | ADMIN | Create — auto `ADM-YYYY-NNNN` + temp password. Returns `{ student, credentials }` |
 | PATCH | `/students/:id` | ADMIN | Update profile, status, guardian, or move section (re-enrolls) |
 | DELETE | `/students/:id` | ADMIN | Soft withdraw → `WITHDRAWN` + login disabled. `?hard=true` purges |
+| POST | `/students/import` | ADMIN | Bulk CSV import. Body `{ csv, dryRun=true, defaultPassword? }`. Returns `{ dryRun, total, imported, skipped, errors[{row,email,message}], sample? }` |
+
+### Bulk import — CSV (Students) ✅
+
+`POST /students/import` · ADMIN only · body `{ csv: string (1–2 MB), dryRun?: boolean = true, defaultPassword?: string }`
+
+The importer is **dry-run first by design**: a school uploads one file for a whole intake, so every
+problem must be visible *before* an account exists. Re-run with `dryRun: false` to create the rows
+that passed.
+
+| Column | Required | Notes |
+|---|---|---|
+| `name` | ✅ | min 2 chars |
+| `email` | ✅ | unique; duplicates **inside the file** are flagged (first occurrence wins) |
+| `date_of_birth` | ✅ | `YYYY-MM-DD` or `DD/MM/YYYY`, must be in the past |
+| `gender` | ✅ | `MALE`/`FEMALE`/`OTHER`, aliases `M`/`F`/`O`, `Male`/`Female`, `Boy`/`Girl` |
+| `guardian_name` | ✅ | |
+| `guardian_relation` | — | defaults to `Guardian` |
+| `guardian_phone` | ✅ | ≥ 7 digits after stripping non-digits |
+| `phone`, `city`, `address`, `guardian_email` | — | copied through when present |
+
+Response:
+
+```json
+{
+  "dryRun": true,
+  "total": 3,
+  "imported": 2,
+  "skipped": 1,
+  "errors": [{ "row": 4, "email": "bad@x", "message": "Email is not valid" }],
+  "sample": { "email": "…", "temporaryPassword": "…" }
+}
+```
+
+- `row` is the **spreadsheet row number** (header is row 1), so it lines up with Excel.
+- A dry run also checks for existing accounts, so 2 clean runs never turn into a failed import.
+- Each passing row is created through the normal `createStudent` path — same admission-number
+  sequence, same temporary-password rule, same audit entry.
+- The UI ships a template download (`students-import-template.csv`) and shows the error table
+  before enabling the Import button.
 
 ### Teachers — Phase 3 ✅
 
@@ -258,6 +311,33 @@ Audiences: `ALL · ADMINS · TEACHERS · STUDENTS · PARENTS · CLASS`. Read sta
 (`notification_reads`), so a broadcast stays unread until each account opens it. Teachers may
 target `STUDENTS`, `PARENTS` or one of their own classes — never `ALL` or another class.
 
+### Outbound email & SMS
+
+`POST /notifications` accepts `channel: IN_APP | EMAIL | SMS`. The in-app row is always written
+first, then delivery is attempted, so a provider outage can never lose the notice.
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "cm…",
+    "delivery": { "attempted": 214, "sent": 211, "failed": 3, "channels": ["EMAIL"] }
+  }
+}
+```
+
+- Recipients for **EMAIL** are the active accounts in the audience (class-scoped for `CLASS`).
+- Recipients for **SMS** are guardian phone numbers — parents are who a school texts. A guardian
+  with two children in the same class is messaged once.
+- Delivery is **off unless configured** (`DELIVERY_ENABLED=true` plus `EMAIL_API_URL` /
+  `SMS_API_URL`). While off, the notice is saved and `delivery.attempted` is `0`.
+- Sends run with a 10 s timeout and 5-way concurrency; individual failures are logged and counted,
+  never thrown into the request.
+
+Supported transport shapes (see `backend/.env.example`): `EMAIL_PROVIDER=generic` posts
+`{from,to,subject,text}` / `{to,message}` with a bearer token to your URL; `EMAIL_PROVIDER=resend`
+uses Resend's email schema.
+
 ---
 
 ## Dashboards
@@ -324,6 +404,34 @@ catalogue stays consistent without a separate stock table.
 
 ---
 
+## Account & security
+
+Available to every authenticated role — a user always acts on **their own** account.
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/auth/sessions` | Active refresh tokens: `id`, `userAgent`, `ipAddress`, `createdAt`, `expiresAt` |
+| DELETE | `/auth/sessions/:id` | Revoke one of *your own* sessions (someone else's returns 400) |
+| DELETE | `/auth/sessions` | Revoke every session except the current one → `{ revoked }` |
+| PATCH | `/auth/profile` | `{ name?, phone?, avatarUrl? }` — role and email are **not** accepted |
+| POST | `/auth/change-password` | `{ currentPassword, newPassword, confirmPassword }`, revokes all sessions |
+
+### Password policy
+
+New passwords must be 10–128 characters and contain an uppercase letter, a lowercase letter and a
+digit. Common passwords (`password123`, `qwerty123`, `admin123`, …), single repeated characters and
+starting sequences such as `1234` / `qwer` are rejected. The same rule applies to change-password,
+student and teacher creation, and admin-created accounts. Violations return `400 VALIDATION_ERROR`.
+
+### Brute-force lockout
+
+Five consecutive failures lock the account for 15 minutes (`users.lockedUntil`). The response stays
+`401` but switches to *"Too many failed attempts…"*, and an `auth.lockout` audit entry is written.
+A successful sign-in clears the counter. Unknown emails are verified against a dummy hash so timing
+does not reveal whether an account exists.
+
+---
+
 ## Administration — users, settings and alerts
 
 `ADMIN` only; every other role receives `403`.
@@ -338,6 +446,7 @@ catalogue stays consistent without a separate stock table.
 | GET | `/admin/settings` | Ten known keys, each with `source: database \| default` |
 | PATCH | `/admin/settings` | `{ updates: [{ key, value }] }` — unknown keys reject the whole batch |
 | GET | `/admin/alerts` | Alerts derived on read from fees, attendance, library, inventory, HR |
+| GET | `/admin/audit-logs` | Immutable audit trail — `page`, `limit`, `action`, `userId`, `from`, `to` |
 
 Suspending an account blocks sign-in immediately. Alerts are **not stored** — each one is a live
 query, so fixing the underlying record clears the alert on the next refresh.
@@ -378,6 +487,18 @@ Money columns are `DECIMAL(12,2)` in PKR. Dates are UTC; calendar days use `DATE
 
 ---
 
+## Testing
+
+```
+npm test                 # backend (needs DATABASE_URL + migrated schema) then frontend
+npm run test:backend
+npm run test:frontend
+```
+
+Backend suites hit a real Postgres through supertest; frontend suites are DOM-free Vitest checks of
+`lib/validation/schemas.ts` and `lib/api-client.ts` (CSRF header, one-shot refresh on 401, error
+envelope). CI runs both.
+
 ## Roadmap for the API surface
 
 | Phase | Adds |
@@ -408,5 +529,6 @@ Every route below is served under `/api/v1` and shares the envelope
 | Notifications | `GET/POST /notifications`, `GET /notifications/unread-count`, `/options`, `/stats`, `POST /notifications/read-all`, `PATCH /notifications/:id` |
 | Dashboards | `GET /dashboard/summary` (role-aware) |
 | Reports | `GET /reports/fees`, `/attendance`, `/performance`, `/enrolment`, `/export` (CSV), `/export.pdf` (PDF) |
-| Operations | `GET /library/overview`, `/library/books`, `/library/issues`, `POST /library/issues`, `PATCH /library/issues/:id/return`, `POST /library/refresh-overdue`, `GET /transport/overview`, `/transport/routes/:id/riders`, `GET /hostel/overview`, `GET /inventory/overview`, `GET /hr/payroll`, `/hr/leaves` |
+| Operations | `GET /library/overview`, `/library/books`, `/library/issues`, `POST /library/issues`, `PATCH /library/issues/:id/return`, `POST /library/refresh-overdue`, `GET /transport/overview`, `/transport/routes/:id/riders`, `GET /hostel/overview`, `GET /inventory/overview`, `GET /hr/payroll`, `/hr/leaves` · **writes:** `POST/PATCH /transport/vehicles`, `/transport/routes`, `/transport/assignments` + `DELETE` for each, `POST/PATCH /hostel/rooms`, `/hostel/allocations`, `POST /hostel/allocations/:id/vacate`, `POST/PATCH /inventory/items`, `POST /inventory/items/:id/adjust`, `POST/PATCH /hr/staff`, `/hr/payroll` + `/hr/payroll/:period/pay`, `POST /hr/leaves`, `PATCH /hr/leaves/:id` |
+| Uploads | `POST /uploads/avatar` (multipart, PNG/JPEG/WebP ≤ 2 MB), `DELETE /uploads/avatar`, static `GET /uploads/avatars/:file` |
 | Administration | `GET/POST /admin/users`, `PATCH /admin/users/:id/status`, `POST /admin/users/:id/reset-password`, `GET /admin/staff`, `GET/PATCH /admin/settings`, `GET /admin/alerts` |

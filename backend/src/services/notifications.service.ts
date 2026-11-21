@@ -1,6 +1,7 @@
 import { Prisma, type NotificationAudience, type NotificationChannel, type Role } from '@prisma/client'
 import { prisma } from '../config/prisma.js'
 import { badRequest, forbidden, notFound } from '../utils/errors.js'
+import { deliver, isChannelEnabled, summarise, type DeliveryChannel } from './delivery.service.js'
 
 /**
  * Notifications module.
@@ -270,6 +271,56 @@ export interface CreateNotificationInput {
   classId?: string | null
 }
 
+/**
+ * Everyone who should receive `audience` over an outbound channel.
+ *
+ * Email addresses come from the account; phone numbers do not exist on `User`,
+ * so SMS reach is computed from guardian records (parents are the people a
+ * school actually texts). Duplicates are collapsed so a parent with two
+ * children in the same class is messaged once.
+ */
+async function resolveRecipients(
+  audience: NotificationAudience,
+  classId: string | null,
+): Promise<{ emails: string[]; phones: string[] }> {
+  // `classId` only narrows CLASS notices; the other audiences are role-wide.
+  const classFilter = audience === 'CLASS' && classId ? { classId } : {}
+
+  const users = await prisma.user.findMany({
+    where: {
+      status: 'ACTIVE',
+      ...(AUDIENCE_ROLE[audience] ? { role: AUDIENCE_ROLE[audience] } : {}),
+      ...(audience === 'CLASS' && classId
+        ? { student: { is: { classId, status: 'ACTIVE' } } }
+        : {}),
+    },
+    select: { email: true },
+  })
+
+  const emails = new Set(users.map((u) => u.email).filter(Boolean))
+
+  // Parents/guardians of the targeted learners carry the phone numbers.
+  const wantsParents = audience === 'PARENTS' || audience === 'CLASS' || audience === 'ALL'
+  const phones = new Set<string>()
+  if (wantsParents) {
+    const guardians = await prisma.guardian.findMany({
+      where: {
+        phone: { not: '' },
+        ...(audience === 'CLASS' || Object.keys(classFilter).length
+          ? { student: { is: { ...classFilter, status: 'ACTIVE' } } }
+          : {}),
+      },
+      select: { phone: true },
+    })
+    for (const g of guardians) {
+      const clean = g.phone.replace(/[^\d+]/g, '')
+      if (clean.length >= 10) phones.add(clean)
+    }
+  }
+
+  return { emails: [...emails], phones: [...phones] }
+}
+
 export async function createNotification(actor: Actor, input: CreateNotificationInput) {
   const allowed = COMPOSE_AUDIENCES[actor.role]
   if (!allowed) throw forbidden('Only staff can send notifications')
@@ -301,7 +352,29 @@ export async function createNotification(actor: Actor, input: CreateNotification
     select: { id: true },
   })
 
-  return { id: notice.id }
+  // In-app row is saved first: the notice must exist even if a provider is down.
+  const result: {
+    id: string
+    delivery?: ReturnType<typeof summarise> & { channels: DeliveryChannel[] }
+  } = { id: notice.id }
+
+  const channel = input.channel ?? 'IN_APP'
+  if (channel !== 'IN_APP' && isChannelEnabled(channel)) {
+    const recipients = await resolveRecipients(input.audience, input.classId ?? null)
+    const targets =
+      channel === 'EMAIL'
+        ? recipients.emails.map((to) => ({ to, subject: input.title, text: input.body }))
+        : recipients.phones.map((to) => ({ to, text: `${input.title}\n\n${input.body}` }))
+
+    const results = await deliver(channel, targets)
+    result.delivery = { ...summarise(results), channels: [channel] }
+  } else if (channel !== 'IN_APP') {
+    // Asking for EMAIL/SMS while delivery is switched off is a configuration
+    // fact, not a user error — report it instead of silently doing nothing.
+    result.delivery = { attempted: 0, sent: 0, failed: 0, channels: [] }
+  }
+
+  return result
 }
 
 export async function deleteNotification(actor: Actor, id: string) {

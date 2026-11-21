@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Download, UserPlus, Loader2 } from "lucide-react"
+import { Search, Download, UserPlus, Loader2, Upload } from "lucide-react"
 import type { StudentStatus } from "@/lib/hooks/use-students"
 
 export interface StudentFilterValues {
@@ -24,6 +24,7 @@ interface StudentFiltersProps {
   onChange: (next: StudentFilterValues) => void
   classes: { id: string; name: string }[]
   onAddStudent?: () => void
+  onImportStudents?: () => void
   onExport?: () => void
   isExporting?: boolean
 }
@@ -33,6 +34,7 @@ export function StudentFilters({
   onChange,
   classes,
   onAddStudent,
+  onImportStudents,
   onExport,
   isExporting = false,
 }: StudentFiltersProps) {
@@ -109,6 +111,14 @@ export function StudentFilters({
         >
           {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
           Export
+        </Button>
+        <Button
+          variant="outline"
+          className="flex-1 gap-2 bg-transparent md:flex-none"
+          onClick={onImportStudents}
+        >
+          <Upload className="h-4 w-4" />
+          Import
         </Button>
         <Button className="flex-1 gap-2 md:flex-none" onClick={onAddStudent}>
           <UserPlus className="h-4 w-4" />

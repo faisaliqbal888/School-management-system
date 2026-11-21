@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -20,11 +22,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { FormField, FormItem, FormMessage } from "@/components/ui/form"
 import { Separator } from "@/components/ui/separator"
 import { toast } from "sonner"
 import { CheckCircle2, Copy, Check, Loader2, Wallet } from "lucide-react"
 import { formatPKR } from "@/lib/format"
 import { useRecordPayment, type InvoiceRow, type PaymentMethod } from "@/lib/hooks/use-fees"
+import { paymentSchema, type PaymentValues } from "@/lib/validation/schemas"
 
 interface RecordPaymentModalProps {
   invoice: InvoiceRow | null
@@ -49,46 +53,50 @@ export function RecordPaymentModal({
 }: RecordPaymentModalProps) {
   const recordPayment = useRecordPayment()
 
-  const [amount, setAmount] = useState("")
-  const [method, setMethod] = useState<PaymentMethod>("CASH")
-  const [reference, setReference] = useState("")
-  const [notes, setNotes] = useState("")
-  const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [receipt, setReceipt] = useState<{ receiptNo: string; amount: number; balance: number } | null>(null)
   const [copied, setCopied] = useState(false)
 
+  const form = useForm<PaymentValues>({
+    resolver: zodResolver(paymentSchema),
+    defaultValues: {
+      amount: invoice?.balance ?? 0,
+      method: "CASH",
+      reference: "",
+      notes: "",
+    },
+  })
+
+  const method = form.watch("method")
+  const numeric = Number(form.watch("amount")) || 0
+
   useEffect(() => {
     if (!open || !invoice) return
-    setAmount(String(invoice.balance))
-    setMethod("CASH")
-    setReference("")
-    setNotes("")
-    setError("")
+    form.reset({ amount: invoice.balance, method: "CASH", reference: "", notes: "" })
     setReceipt(null)
     setCopied(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, invoice])
 
   if (!invoice) return null
 
-  const numeric = Number(amount)
-  const valid = Number.isFinite(numeric) && numeric > 0 && numeric <= invoice.balance + 0.001
-
-  const handleSave = async () => {
-    if (!valid) {
-      setError(`Enter an amount between Rs 1 and ${formatPKR(invoice.balance)}`)
+  const handleSave = form.handleSubmit(async (values) => {
+    // The cap depends on the invoice, so it cannot live in a static schema.
+    if (values.amount > invoice.balance + 0.001) {
+      form.setError("amount", {
+        message: `Enter an amount between Rs 1 and ${formatPKR(invoice.balance)}`,
+      })
       return
     }
 
-    setError("")
     setSaving(true)
     try {
       const res = await recordPayment({
         invoiceId: invoice.id,
-        amount: numeric,
-        method,
-        reference: reference.trim() || null,
-        notes: notes.trim() || null,
+        amount: values.amount,
+        method: values.method,
+        reference: values.reference.trim() || null,
+        notes: values.notes.trim() || null,
       })
       setReceipt({ receiptNo: res.receiptNo, amount: res.amount, balance: res.balance })
       toast.success(`Payment recorded · ${res.receiptNo}`, {
@@ -96,11 +104,13 @@ export function RecordPaymentModal({
       })
       onRecorded?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not record the payment")
+      form.setError("root", {
+        message: err instanceof Error ? err.message : "Could not record the payment",
+      })
     } finally {
       setSaving(false)
     }
-  }
+  })
 
   const copyReceipt = async () => {
     if (!receipt) return
@@ -181,84 +191,102 @@ export function RecordPaymentModal({
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Amount received (PKR)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={invoice.balance}
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  {[invoice.balance, Math.round(invoice.balance / 2)].map((preset, i) => (
-                    <Button
-                      key={i}
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setAmount(String(preset))}
-                      className="text-xs"
-                    >
-                      {i === 0 ? "Full balance" : "Half"} · {formatPKR(preset)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
+            <form onSubmit={handleSave} className="space-y-4" noValidate>
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <Label>Amount received (PKR)</Label>
+                    <Input type="number" min={1} max={invoice.balance} {...field} />
+                    <div className="flex gap-2">
+                      {[invoice.balance, Math.round(invoice.balance / 2)].map((preset, i) => (
+                        <Button
+                          key={i}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => form.setValue("amount", preset, { shouldValidate: true })}
+                          className="text-xs"
+                        >
+                          {i === 0 ? "Full balance" : "Half"} · {formatPKR(preset)}
+                        </Button>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <div className="space-y-2">
-                <Label>Method</Label>
-                <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {METHODS.map((m) => (
-                      <SelectItem key={m.value} value={m.value}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <FormField
+                control={form.control}
+                name="method"
+                render={({ field }) => (
+                  <FormItem>
+                    <Label>Method</Label>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {METHODS.map((m) => (
+                          <SelectItem key={m.value} value={m.value}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {method !== "CASH" && (
-                <div className="space-y-2">
-                  <Label>Reference</Label>
-                  <Input
-                    placeholder={method === "CHEQUE" ? "Cheque number" : "Transaction / slip ref"}
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="reference"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label>Reference</Label>
+                      <Input
+                        placeholder={method === "CHEQUE" ? "Cheque number" : "Transaction / slip ref"}
+                        {...field}
+                      />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
 
-              <div className="space-y-2">
-                <Label>Notes (optional)</Label>
-                <Input
-                  placeholder="e.g. Received by front office"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-            </div>
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <Label>Notes (optional)</Label>
+                    <Input placeholder="e.g. Received by front office" {...field} />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+              {form.formState.errors.root && (
+                <Alert variant="destructive">
+                  <AlertDescription>{form.formState.errors.root.message}</AlertDescription>
+                </Alert>
+              )}
 
-            <DialogFooter className="gap-2 sm:gap-0">
-              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-                Cancel
-              </Button>
-              <Button onClick={() => void handleSave()} disabled={saving || !valid}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {saving ? "Recording…" : `Record ${formatPKR(numeric || 0)}`}
-              </Button>
-            </DialogFooter>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {saving ? "Recording…" : `Record ${formatPKR(numeric || 0)}`}
+                </Button>
+              </DialogFooter>
+            </form>
+
           </>
         )}
       </DialogContent>

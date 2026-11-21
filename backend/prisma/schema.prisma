@@ -204,6 +204,10 @@ model User {
   phone         String?
   avatarUrl     String?
   lastLoginAt   DateTime?
+  /// Brute-force protection: consecutive failures and the lockout deadline.
+  failedLoginAttempts Int      @default(0)
+  lockedUntil         DateTime?
+  passwordChangedAt   DateTime?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -216,6 +220,7 @@ model User {
   auditLogs     AuditLog[]
 
   @@index([role, status])
+  @@index([lockedUntil])
   @@map("users")
 }
 
@@ -720,6 +725,7 @@ model Notification {
   reads  NotificationRead[]
 
   @@index([audience, createdAt])
+  @@index([classId, createdAt])
   @@map("notifications")
 }
 

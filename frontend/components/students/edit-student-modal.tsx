@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -23,6 +25,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Loader2 } from "lucide-react"
 import { useApiQuery } from "@/lib/hooks/use-api-query"
+import { studentEditSchema, type StudentEditValues } from "@/lib/validation/schemas"
 import {
   useStudent,
   useUpdateStudent,
@@ -69,24 +72,28 @@ export function EditStudentModal({
     enabled: open && !!classId,
   })
 
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    dateOfBirth: "",
-    gender: "" as "" | "MALE" | "FEMALE" | "OTHER",
-    bloodGroup: "",
-    address: "",
-    city: "",
-    status: "ACTIVE" as StudentStatus,
-    sectionId: "",
-    rollNo: "",
-    guardianName: "",
-    guardianRelation: "",
-    guardianPhone: "",
-    guardianEmail: "",
-    guardianCnic: "",
-    guardianOccupation: "",
+  const form = useForm<StudentEditValues>({
+    resolver: zodResolver(studentEditSchema),
+    defaultValues: {
+      name: "",
+      phone: "",
+      dateOfBirth: "",
+      gender: "",
+      bloodGroup: "",
+      address: "",
+      city: "",
+      status: "ACTIVE",
+      sectionId: "",
+      rollNo: "",
+      guardianName: "",
+      guardianRelation: "",
+      guardianPhone: "",
+      guardianEmail: "",
+      guardianCnic: "",
+      guardianOccupation: "",
+    },
   })
+  const values = form.watch()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
 
@@ -94,11 +101,11 @@ export function EditStudentModal({
   useEffect(() => {
     if (!student) return
     const primary = student.guardians.find((g) => g.isPrimary) ?? student.guardians[0]
-    setForm({
+    form.reset({
       name: student.name,
       phone: student.phone ?? "",
       dateOfBirth: student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : "",
-      gender: student.gender,
+      gender: student.gender ?? "",
       bloodGroup: student.bloodGroup ?? "",
       address: student.address ?? "",
       city: student.city ?? "",
@@ -114,50 +121,41 @@ export function EditStudentModal({
     })
     setClassId(student.class?.id ?? "")
     setError("")
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [student])
 
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
-    setForm((prev) => ({ ...prev, [key]: value }))
+  const set = <K extends keyof StudentEditValues>(key: K, value: StudentEditValues[K]) =>
+    form.setValue(key, value as never, { shouldDirty: true })
 
-  const handleSave = async () => {
+  const handleSave = form.handleSubmit(async (data) => {
     if (!student) return
-    if (form.name.trim().length < 2) {
-      setError("Please enter the student's full name")
-      return
-    }
-    if (form.phone.trim() && form.phone.trim().length < 7) {
-      setError("Phone number is too short")
-      return
-    }
 
     setError("")
     setSaving(true)
     try {
       const guardian =
-        form.guardianName.trim() && form.guardianRelation.trim() && form.guardianPhone.trim()
+        data.guardianName.trim() && data.guardianRelation.trim() && data.guardianPhone.trim()
           ? {
-              name: form.guardianName.trim(),
-              relation: form.guardianRelation.trim(),
-              phone: form.guardianPhone.trim(),
-              email: form.guardianEmail.trim() || null,
-              cnic: form.guardianCnic.trim() || null,
-              occupation: form.guardianOccupation.trim() || null,
+              name: data.guardianName.trim(),
+              relation: data.guardianRelation.trim(),
+              phone: data.guardianPhone.trim(),
+              email: data.guardianEmail.trim() || null,
+              cnic: data.guardianCnic.trim() || null,
+              occupation: data.guardianOccupation.trim() || null,
             }
           : undefined
 
       await updateStudent(student.id, {
-        name: form.name.trim(),
-        phone: form.phone.trim() || null,
-        dateOfBirth: form.dateOfBirth || undefined,
-        gender: form.gender as "MALE" | "FEMALE" | "OTHER",
-        bloodGroup: form.bloodGroup.trim() || null,
-        address: form.address.trim() || null,
-        city: form.city.trim() || null,
-        status: form.status,
-        ...(form.sectionId && form.sectionId !== student.section?.id
-          ? { sectionId: form.sectionId }
-          : {}),
-        rollNo: form.rollNo.trim() || null,
+        name: data.name.trim(),
+        phone: data.phone?.trim() || null,
+        dateOfBirth: data.dateOfBirth || undefined,
+        gender: (data.gender || undefined) as "MALE" | "FEMALE" | "OTHER" | undefined,
+        bloodGroup: data.bloodGroup.trim() || null,
+        address: data.address.trim() || null,
+        city: data.city.trim() || null,
+        status: data.status,
+        ...(data.sectionId && data.sectionId !== student.section?.id ? { sectionId: data.sectionId } : {}),
+        rollNo: data.rollNo.trim() || null,
         ...(guardian ? { guardian } : {}),
       })
 
@@ -169,7 +167,7 @@ export function EditStudentModal({
     } finally {
       setSaving(false)
     }
-  }
+  })
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -193,16 +191,16 @@ export function EditStudentModal({
             ))}
           </div>
         ) : (
-          <div className="space-y-6 py-2">
+          <form id="edit-student-form" onSubmit={handleSave} noValidate className="space-y-6 py-2">
             <section className="space-y-4">
               <h3 className="text-sm font-semibold text-muted-foreground">Personal</h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Full Name" required>
-                  <Input value={form.name} onChange={(e) => set("name", e.target.value)} />
+                <Field label="Full Name" required error={form.formState.errors.name?.message}>
+                  <Input value={values.name} onChange={(e) => set("name", e.target.value)} />
                 </Field>
-                <Field label="Status">
+                <Field label="Status" error={form.formState.errors.status?.message}>
                   <Select
-                    value={form.status}
+                    value={values.status}
                     onValueChange={(v) => set("status", v as StudentStatus)}
                   >
                     <SelectTrigger>
@@ -217,17 +215,17 @@ export function EditStudentModal({
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Date of Birth">
+                <Field label="Date of Birth" error={form.formState.errors.dateOfBirth?.message}>
                   <Input
                     type="date"
-                    value={form.dateOfBirth}
+                    value={values.dateOfBirth}
                     onChange={(e) => set("dateOfBirth", e.target.value)}
                   />
                 </Field>
-                <Field label="Gender">
+                <Field label="Gender" error={form.formState.errors.gender?.message}>
                   <Select
-                    value={form.gender}
-                    onValueChange={(v) => set("gender", v as typeof form.gender)}
+                    value={values.gender}
+                    onValueChange={(v) => set("gender", v as typeof values.gender)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select gender" />
@@ -240,19 +238,19 @@ export function EditStudentModal({
                   </Select>
                 </Field>
                 <Field label="Phone">
-                  <Input value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+                  <Input value={values.phone} onChange={(e) => set("phone", e.target.value)} />
                 </Field>
-                <Field label="Blood Group">
+                <Field label="Blood Group" error={form.formState.errors.bloodGroup?.message}>
                   <Input
-                    value={form.bloodGroup}
+                    value={values.bloodGroup}
                     onChange={(e) => set("bloodGroup", e.target.value)}
                   />
                 </Field>
-                <Field label="Address" className="md:col-span-2">
-                  <Input value={form.address} onChange={(e) => set("address", e.target.value)} />
+                <Field label="Address" className="md:col-span-2" error={form.formState.errors.address?.message}>
+                  <Input value={values.address} onChange={(e) => set("address", e.target.value)} />
                 </Field>
-                <Field label="City">
-                  <Input value={form.city} onChange={(e) => set("city", e.target.value)} />
+                <Field label="City" error={form.formState.errors.city?.message}>
+                  <Input value={values.city} onChange={(e) => set("city", e.target.value)} />
                 </Field>
               </div>
             </section>
@@ -282,7 +280,7 @@ export function EditStudentModal({
                 </Field>
                 <Field label="Section">
                   <Select
-                    value={form.sectionId}
+                    value={values.sectionId}
                     onValueChange={(v) => set("sectionId", v)}
                     disabled={!classId}
                   >
@@ -300,8 +298,8 @@ export function EditStudentModal({
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Roll Number">
-                  <Input value={form.rollNo} onChange={(e) => set("rollNo", e.target.value)} />
+                <Field label="Roll Number" error={form.formState.errors.rollNo?.message}>
+                  <Input value={values.rollNo} onChange={(e) => set("rollNo", e.target.value)} />
                 </Field>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -312,46 +310,46 @@ export function EditStudentModal({
             <section className="space-y-4">
               <h3 className="text-sm font-semibold text-muted-foreground">Primary Guardian</h3>
               <div className="grid gap-4 md:grid-cols-2">
-                <Field label="Name">
+                <Field label="Name" error={form.formState.errors.guardianName?.message}>
                   <Input
-                    value={form.guardianName}
+                    value={values.guardianName}
                     onChange={(e) => set("guardianName", e.target.value)}
                   />
                 </Field>
-                <Field label="Relation">
+                <Field label="Relation" error={form.formState.errors.guardianRelation?.message}>
                   <Input
-                    value={form.guardianRelation}
+                    value={values.guardianRelation}
                     onChange={(e) => set("guardianRelation", e.target.value)}
                   />
                 </Field>
                 <Field label="Phone">
                   <Input
-                    value={form.guardianPhone}
+                    value={values.guardianPhone}
                     onChange={(e) => set("guardianPhone", e.target.value)}
                   />
                 </Field>
                 <Field label="Email">
                   <Input
                     type="email"
-                    value={form.guardianEmail}
+                    value={values.guardianEmail}
                     onChange={(e) => set("guardianEmail", e.target.value)}
                   />
                 </Field>
-                <Field label="CNIC">
+                <Field label="CNIC" error={form.formState.errors.guardianCnic?.message}>
                   <Input
-                    value={form.guardianCnic}
+                    value={values.guardianCnic}
                     onChange={(e) => set("guardianCnic", e.target.value)}
                   />
                 </Field>
-                <Field label="Occupation">
+                <Field label="Occupation" error={form.formState.errors.guardianOccupation?.message}>
                   <Input
-                    value={form.guardianOccupation}
+                    value={values.guardianOccupation}
                     onChange={(e) => set("guardianOccupation", e.target.value)}
                   />
                 </Field>
               </div>
             </section>
-          </div>
+          </form>
         )}
 
         {(error || loadError) && (
@@ -361,10 +359,10 @@ export function EditStudentModal({
         )}
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSave()} disabled={saving || isLoading || !student}>
+          <Button type="submit" form="edit-student-form" disabled={saving || isLoading || !student}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {saving ? "Saving…" : "Save Changes"}
           </Button>
@@ -378,11 +376,13 @@ function Field({
   label,
   required,
   className,
+  error,
   children,
 }: {
   label: string
   required?: boolean
   className?: string
+  error?: string
   children: React.ReactNode
 }) {
   return (
@@ -392,6 +392,7 @@ function Field({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
 }

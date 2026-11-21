@@ -127,6 +127,8 @@ export function useAlerts() {
 
 export interface StaffRow {
   id: string
+  /** Distinguishes a teachers-row id from an office-staff id (both are cuids). */
+  type: "teacher" | "staff"
   employeeNo: string
   name: string
   position: string

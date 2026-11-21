@@ -192,25 +192,45 @@ export async function resetPassword(actor: Actor, userId: string) {
 export async function listStaffDirectory(actor: Actor) {
   requireAdmin(actor)
 
-  const rows = await prisma.staff.findMany({
-    orderBy: [{ status: 'asc' }, { name: 'asc' }],
-    select: {
-      id: true,
-      employeeNo: true,
-      name: true,
-      designation: true,
-      department: true,
-      email: true,
-      phone: true,
-      employmentType: true,
-      baseSalary: true,
-      status: true,
-      joiningDate: true,
-    },
-  })
+  // Both kinds of employee appear here — office staff *and* teachers. Callers
+  // (leave requests, payroll) need to pick either, and `type` is what tells them
+  // which foreign key an id belongs to.
+  const [staff, teachers] = await Promise.all([
+    prisma.staff.findMany({
+      orderBy: [{ status: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        employeeNo: true,
+        name: true,
+        designation: true,
+        department: true,
+        email: true,
+        phone: true,
+        employmentType: true,
+        baseSalary: true,
+        status: true,
+        joiningDate: true,
+      },
+    }),
+    prisma.teacher.findMany({
+      orderBy: [{ status: 'asc' }, { user: { name: 'asc' } }],
+      select: {
+        id: true,
+        employeeNo: true,
+        department: true,
+        designation: true,
+        employmentType: true,
+        baseSalary: true,
+        status: true,
+        joiningDate: true,
+        user: { select: { name: true, email: true, phone: true } },
+      },
+    }),
+  ])
 
-  return rows.map((row) => ({
+  const staffRows = staff.map((row) => ({
     id: row.id,
+    type: 'staff' as const,
     employeeNo: row.employeeNo,
     name: row.name,
     position: row.designation,
@@ -222,6 +242,23 @@ export async function listStaffDirectory(actor: Actor) {
     status: row.status,
     joiningDate: row.joiningDate.toISOString(),
   }))
+
+  const teacherRows = teachers.map((row) => ({
+    id: row.id,
+    type: 'teacher' as const,
+    employeeNo: row.employeeNo,
+    name: row.user.name,
+    position: row.designation,
+    department: row.department,
+    email: row.user.email,
+    phone: row.user.phone,
+    employmentType: row.employmentType,
+    baseSalary: money(row.baseSalary),
+    status: row.status,
+    joiningDate: row.joiningDate.toISOString(),
+  }))
+
+  return [...staffRows, ...teacherRows].sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // ═════════════════════════════════════════════════════════════

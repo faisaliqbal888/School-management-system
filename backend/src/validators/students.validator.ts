@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { strongPasswordSchema } from './auth.validator.js'
 import { paginationSchema } from '../utils/pagination.js'
 
 const STUDENT_STATUS = [
@@ -47,7 +48,7 @@ export const createStudentSchema = z.object({
   rollNo: z.string().trim().max(20).nullish(),
   photoUrl: z.string().trim().max(300).nullish(),
   guardian: guardianSchema,
-  password: z.string().min(8, 'Password must be at least 8 characters').max(200).optional(),
+  password: strongPasswordSchema.optional(),
 })
 
 export const updateStudentSchema = z

@@ -24,12 +24,49 @@ const optionalPhone = z
   })
   .optional()
 
+// ── Password policy ──────────────────────────────────────────
+/**
+ * Mirrors `strongPasswordSchema` in `backend/src/validators/auth.validator.ts`.
+ * Keep the two lists in step — a client that accepts what the server rejects
+ * produces a confusing 400 after a round trip.
+ */
+const COMMON_PASSWORDS = new Set([
+  "password",
+  "password1",
+  "password123",
+  "password1234",
+  "12345678",
+  "123456789",
+  "1234567890",
+  "qwerty123",
+  "qwertyuiop",
+  "letmein123",
+  "welcome123",
+  "admin123",
+  "iloveyou",
+  "abc12345",
+  "school123",
+  "changeme",
+  "changeme123",
+])
+
+export const strongPassword = z
+  .string()
+  .min(10, "Use at least 10 characters")
+  .max(128, "Too long")
+  .regex(/[A-Z]/, "Add an uppercase letter")
+  .regex(/[a-z]/, "Add a lowercase letter")
+  .regex(/[0-9]/, "Add a digit")
+  .refine((value) => !COMMON_PASSWORDS.has(value.toLowerCase()), {
+    message: "This password is too common",
+  })
+
 // ── Users ────────────────────────────────────────────────────
 export const createUserSchema = z.object({
   name: z.string().trim().min(2, "Name is too short").max(120),
   email: z.string().trim().min(1, "Email is required").email("Enter a valid email"),
   role: z.enum(["ADMIN", "TEACHER", "STUDENT", "PARENT"]),
-  password: z.string().min(8, "Use at least 8 characters").max(72),
+  password: strongPassword,
 })
 export type CreateUserValues = z.infer<typeof createUserSchema>
 
@@ -42,7 +79,10 @@ export const studentSchema = z.object({
     .string()
     .min(1, "Date of birth is required")
     .refine((value) => new Date(value) < new Date(), "Date of birth must be in the past"),
-  gender: z.enum(["MALE", "FEMALE", "OTHER"], { message: "Pick a gender" }),
+  // Accepts "" so the select can start empty; the message drives the empty case.
+  gender: z
+    .string()
+    .refine((value) => ["MALE", "FEMALE", "OTHER"].includes(value), "Pick a gender"),
   classId: z.string().optional(),
   sectionId: z.string().optional(),
   rollNo: z.string().trim().max(20).optional(),
@@ -55,6 +95,16 @@ export const studentSchema = z.object({
     .email("Enter a valid guardian email")
     .optional()
     .or(z.literal("")),
+  // Free-text extras the enrolment form collects but the API treats as optional.
+  bloodGroup: z.string().trim().max(8).optional(),
+  address: z.string().trim().max(240).optional(),
+  city: z.string().trim().max(80).optional(),
+  guardianCnic: z
+    .string()
+    .trim()
+    .refine((value) => value === "" || /^\d{5}-?\d{7}-?\d$/.test(value), "CNIC looks wrong (12345-1234567-1)")
+    .optional(),
+  guardianOccupation: z.string().trim().max(80).optional(),
 })
 export type StudentFormValues = z.infer<typeof studentSchema>
 
@@ -66,7 +116,14 @@ export const teacherSchema = z.object({
   department: z.string().trim().min(1, "Department is required").max(80),
   designation: z.string().trim().min(1, "Designation is required").max(80),
   joiningDate: z.string().min(1, "Joining date is required"),
-  baseSalary: z.coerce.number().min(0, "Salary cannot be negative").max(10_000_000),
+  baseSalary: z.coerce
+    .number()
+    .positive("Enter a valid base salary")
+    .max(10_000_000, "That salary looks too high"),
+  qualification: z.string().trim().max(120).optional(),
+  specialization: z.string().trim().max(120).optional(),
+  employmentType: z.enum(["PERMANENT", "CONTRACT", "VISITING", "PART_TIME"]),
+  subjectIds: z.array(z.string()).optional(),
 })
 export type TeacherFormValues = z.infer<typeof teacherSchema>
 
@@ -101,3 +158,228 @@ export const settingsSchema = z.object({
   "finance.lateFeePercent": z.coerce.number().min(0, "Cannot be negative").max(100),
   "attendance.warningThreshold": z.coerce.number().min(0).max(100),
 })
+
+// ── Notifications ────────────────────────────────────────────
+export const AUDIENCES = ["ALL", "ADMINS", "TEACHERS", "STUDENTS", "PARENTS", "CLASS"] as const
+
+export const CHANNELS = ["IN_APP", "EMAIL", "SMS"] as const
+
+export const noticeSchema = z
+  .object({
+    title: z.string().trim().min(3, "Title must be at least 3 characters").max(140),
+    body: z.string().trim().min(5, "Message is too short").max(4000),
+    audience: z.enum(AUDIENCES),
+    channel: z.enum(CHANNELS),
+    classId: z.string(),
+  })
+  .refine((values) => values.audience !== "CLASS" || values.classId.length > 0, {
+    message: "Choose the class this notice is for",
+    path: ["classId"],
+  })
+export type NoticeValues = z.infer<typeof noticeSchema>
+
+// ── Fees ─────────────────────────────────────────────────────
+const money = z.coerce.number().min(0, "Cannot be negative")
+
+export const invoiceSchema = z
+  .object({
+    studentId: z.string().min(1, "Choose a student"),
+    title: z.string().trim().min(1, "Enter an invoice title").max(120),
+    amount: z.coerce.number().positive("Amount must be greater than zero"),
+    discount: money,
+    fine: money,
+    dueDate: z.string().min(1, "Choose a due date"),
+    period: z.string(),
+    notes: z.string().trim().max(500),
+    feeStructureId: z.string(),
+  })
+  .refine((values) => values.discount <= values.amount, {
+    message: "Discount cannot exceed the amount",
+    path: ["discount"],
+  })
+  .refine((values) => values.amount - values.discount + values.fine > 0, {
+    message: "Invoice total must be greater than zero",
+    path: ["amount"],
+  })
+export type InvoiceValues = z.infer<typeof invoiceSchema>
+
+export const paymentSchema = z.object({
+  amount: z.coerce.number().positive("Enter an amount greater than zero"),
+  method: z.enum(["CASH", "BANK_TRANSFER", "CARD", "ONLINE", "CHEQUE"]),
+  reference: z.string().trim().max(64),
+  notes: z.string().trim().max(500),
+})
+export type PaymentValues = z.infer<typeof paymentSchema>
+
+// ── Exams ────────────────────────────────────────────────────
+export const EXAM_TYPES = ["QUIZ", "UNIT_TEST", "MIDTERM", "FINAL", "PRACTICAL", "PROJECT"] as const
+
+export const examSchema = z
+  .object({
+    name: z.string().trim().min(1, "Enter an exam name").max(120),
+    type: z.enum(EXAM_TYPES),
+    classId: z.string().min(1, "Choose a class"),
+    sectionId: z.string(),
+    subjectId: z.string().min(1, "Choose a subject"),
+    examDate: z.string().min(1, "Choose an exam date"),
+    startTime: z.string(),
+    durationMin: z.coerce.number().int().min(5, "At least 5 minutes").max(600),
+    totalMarks: z.coerce.number().int().positive("Total marks must be positive"),
+    passingMarks: z.coerce.number().int().min(0),
+  })
+  .refine((values) => values.passingMarks <= values.totalMarks, {
+    message: "Passing marks cannot exceed total marks",
+    path: ["passingMarks"],
+  })
+export type ExamValues = z.infer<typeof examSchema>
+
+// ── Timetable ────────────────────────────────────────────────
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
+
+export const slotSchema = z
+  .object({
+    classId: z.string().min(1, "Choose a class"),
+    sectionId: z.string(),
+    subjectId: z.string().min(1, "Choose a subject"),
+    teacherId: z.string(),
+    dayOfWeek: z.enum(["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]),
+    startTime: z.string().regex(HHMM, "Use HH:MM"),
+    endTime: z.string().regex(HHMM, "Use HH:MM"),
+    roomNo: z.string().trim().max(20),
+  })
+  .refine((values) => values.endTime > values.startTime, {
+    message: "End time must be after the start time",
+    path: ["endTime"],
+  })
+export type SlotValues = z.infer<typeof slotSchema>
+
+// ── Edit forms ───────────────────────────────────────────────
+// Updates may legitimately clear a field, so most rules are "empty or valid".
+const STUDENT_STATUSES = [
+  "ACTIVE",
+  "INACTIVE",
+  "GRADUATED",
+  "TRANSFERRED",
+  "WITHDRAWN",
+  "PENDING",
+] as const
+
+export const studentEditSchema = z.object({
+  name: z.string().trim().min(2, "Name is too short").max(120),
+  phone: optionalPhone,
+  dateOfBirth: z.string(),
+  gender: z
+    .string()
+    .refine((value) => value === "" || ["MALE", "FEMALE", "OTHER"].includes(value), "Pick a gender"),
+  bloodGroup: z.string().trim().max(8),
+  address: z.string().trim().max(240),
+  city: z.string().trim().max(80),
+  status: z.enum(STUDENT_STATUSES),
+  sectionId: z.string(),
+  rollNo: z.string().trim().max(20),
+  guardianName: z.string().trim().max(120),
+  guardianRelation: z.string().trim().max(40),
+  guardianPhone: z
+    .string()
+    .trim()
+    .max(20)
+    .refine((value) => value === "" || value.replace(/\D/g, "").length >= 7, "Phone number is too short"),
+  guardianEmail: z.string().trim().email("Enter a valid guardian email").or(z.literal("")),
+  guardianCnic: z
+    .string()
+    .trim()
+    .refine((value) => value === "" || /^\d{5}-?\d{7}-?\d$/.test(value), "CNIC looks wrong (12345-1234567-1)"),
+  guardianOccupation: z.string().trim().max(80),
+})
+export type StudentEditValues = z.infer<typeof studentEditSchema>
+
+export const STAFF_STATUSES = ["ACTIVE", "ON_LEAVE", "RESIGNED", "TERMINATED"] as const
+
+export const teacherEditSchema = z.object({
+  name: z.string().trim().min(2, "Name is too short").max(120),
+  phone: optionalPhone,
+  department: z.string().trim().max(80),
+  designation: z.string().trim().max(80),
+  qualification: z.string().trim().max(120),
+  specialization: z.string().trim().max(120),
+  joiningDate: z.string(),
+  employmentType: z.enum(["PERMANENT", "CONTRACT", "VISITING", "PART_TIME"]),
+  baseSalary: z.coerce.number().min(0, "Salary cannot be negative").max(10_000_000),
+  status: z.enum(STAFF_STATUSES),
+  subjectIds: z.array(z.string()).optional(),
+})
+export type TeacherEditValues = z.infer<typeof teacherEditSchema>
+
+// ── Operations ───────────────────────────────────────────────
+export const VEHICLE_STATUSES = ["ACTIVE", "MAINTENANCE", "OUT_OF_SERVICE"] as const
+export const ROOM_TYPES = ["SINGLE", "DOUBLE", "TRIPLE", "DORMITORY"] as const
+export const ROOM_STATUSES = ["AVAILABLE", "FULL", "MAINTENANCE"] as const
+export const ITEM_CONDITIONS = ["NEW", "GOOD", "FAIR", "POOR", "DAMAGED"] as const
+
+export const vehicleSchema = z.object({
+  registrationNo: z.string().trim().min(2, "Registration is required").max(20),
+  model: z.string().trim().min(1, "Model is required").max(60),
+  capacity: z.coerce.number().int().min(1, "At least one seat").max(120),
+  driverName: z.string().trim().min(2, "Driver name is required").max(80),
+  driverPhone: phone,
+  conductorName: z.string().trim().max(80),
+  status: z.enum(VEHICLE_STATUSES),
+  lastServiceAt: z.string(),
+})
+export type VehicleValues = z.infer<typeof vehicleSchema>
+
+export const routeSchema = z.object({
+  name: z.string().trim().min(3, "Route name is required").max(80),
+  startPoint: z.string().trim().min(1, "Start point is required").max(80),
+  endPoint: z.string().trim().min(1, "End point is required").max(80),
+  distanceKm: z.coerce.number().min(0, "Cannot be negative").max(500),
+  monthlyFee: z.coerce.number().min(0, "Cannot be negative").max(1_000_000),
+  vehicleId: z.string(),
+  isActive: z.boolean(),
+})
+export type RouteValues = z.infer<typeof routeSchema>
+
+export const roomSchema = z.object({
+  block: z.string().trim().min(1, "Block is required").max(20),
+  roomNo: z.string().trim().min(1, "Room number is required").max(20),
+  type: z.enum(ROOM_TYPES),
+  capacity: z.coerce.number().int().min(1, "At least one bed").max(40),
+  monthlyFee: z.coerce.number().min(0, "Cannot be negative").max(1_000_000),
+  status: z.enum(ROOM_STATUSES),
+})
+export type RoomValues = z.infer<typeof roomSchema>
+
+export const itemSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(120),
+  code: z.string().trim().min(1, "Code is required").max(40),
+  category: z.string().trim().min(1, "Category is required").max(60),
+  quantity: z.coerce.number().int().min(0, "Cannot be negative"),
+  minQuantity: z.coerce.number().int().min(0, "Cannot be negative"),
+  unitPrice: z.coerce.number().min(0, "Cannot be negative"),
+  location: z.string().trim().max(80),
+  supplier: z.string().trim().max(120),
+  condition: z.enum(ITEM_CONDITIONS),
+})
+export type ItemValues = z.infer<typeof itemSchema>
+
+export const stockAdjustSchema = z.object({
+  delta: z.coerce
+    .number()
+    .int("Use a whole number")
+    .refine((v) => v !== 0, "Enter a non-zero change"),
+  reason: z.string().trim().min(3, "Give a reason for the adjustment").max(200),
+})
+export type StockAdjustValues = z.infer<typeof stockAdjustSchema>
+
+export const leaveSchema = z
+  .object({
+    subject: z.string().min(1, "Choose a staff member"),
+    fromDate: z.string().min(1, "Choose a start date"),
+    toDate: z.string().min(1, "Choose an end date"),
+    reason: z.string().trim().min(3, "Give a reason").max(300),
+  })
+  .refine((v) => new Date(v.toDate) >= new Date(v.fromDate), {
+    message: "The end date cannot be before the start date",
+    path: ["toDate"],
+  })
+export type LeaveValues = z.infer<typeof leaveSchema>

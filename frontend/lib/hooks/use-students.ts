@@ -229,3 +229,27 @@ export function exportStudentsCsv(filters: StudentFilters = {}): void {
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1"
   window.location.href = `${base}/students/export.csv${query ? `?${query}` : ""}`
 }
+
+export interface ImportRowError {
+  row: number
+  email: string
+  message: string
+}
+
+export interface ImportReport {
+  dryRun: boolean
+  total: number
+  imported: number
+  skipped: number
+  errors: ImportRowError[]
+  sample?: { email: string; temporaryPassword: string }
+}
+
+/** Bulk CSV import. Always call with `dryRun: true` first so the user sees row errors. */
+export function useImportStudents() {
+  return useCallback(
+    (payload: { csv: string; dryRun: boolean; defaultPassword?: string }) =>
+      apiFetch<ImportReport>("/students/import", { method: "POST", body: payload }),
+    [],
+  )
+}
