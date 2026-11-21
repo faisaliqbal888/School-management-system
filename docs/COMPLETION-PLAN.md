@@ -14,9 +14,13 @@ than the docs.
 | 4 | **No pagination/perf guardrails on exports.** PDF/CSV build everything in memory. | `reports.service.ts` — fine at demo size, not at year end. |
 | 5 | **Ops docs lag the API.** Roadmap table still lists library/transport/hostel/inventory as "pending". | `docs/API.md` roadmap section. |
 
-## Plan
+## Plan — ALL STEPS DONE ✅
 
-### Step 1 — Operations write paths (backend)
+> Delivered in PR #3 as four commits: `213bc8e` (writes), `21f62d7` (UI), `29c5c2b`
+> (uploads), `e88c15c` (import) + `517f018` (CI fix). Backend **281 tests / 20 files**,
+> frontend **43 tests**, `next build` green, both CI jobs green on `517f018`.
+
+### Step 1 — Operations write paths (backend) ✅
 Full CRUD + workflow for the four modules that only have overviews:
 - Transport: vehicles (CRUD), routes (CRUD), assign learners to a route (seat-capacity check)
 - Hostel: rooms (CRUD), allocate/vacate (capacity + double-booking guard)
@@ -24,22 +28,22 @@ Full CRUD + workflow for the four modules that only have overviews:
 - HR: payroll run for a period (idempotent per staff+period), mark paid; leave
   request create + approve/reject
 
-### Step 2 — Operations UI
+### Step 2 — Operations UI ✅
 Each admin page gains create/edit dialogs and the workflow actions
 (allocate, vacate, adjust stock, run payroll, approve leave). Reuses the
 RHF + zod patterns from Step 0 of the previous round.
 
-### Step 3 — File uploads
+### Step 3 — File uploads ✅
 `multer` in-memory → disk under `backend/uploads/<entity>/`, served statically
 with an allowlist of mime types and a 2 MB cap. One endpoint: `POST /uploads/avatar`
 (students, teachers, self). Wires the disabled avatar button.
 
-### Step 4 — Bulk import
+### Step 4 — Bulk import ✅
 `POST /students/import` accepting CSV, parsed and validated row-by-row, with a
 dry-run mode that returns per-row errors before anything is written. UI modal
 with a template download.
 
-### Step 5 — Docs + QA
+### Step 5 — Docs + QA ✅
 Update `docs/API.md` (roadmap, endpoint map, new endpoints), `PLAN.md`, add
 backend tests for every new endpoint, keep both suites green, PR description
 refreshed.
